@@ -71,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           data: {
             full_name: fullName,
+            role: 'user', // Adding a default role
           },
         },
       });
