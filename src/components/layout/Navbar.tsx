@@ -12,8 +12,8 @@ const Navbar = () => {
 
   const navLinks = [
     { name: "Home", href: "/" },
-    { name: "Learn", href: "/courses" },
-    { name: "Interview", href: "/interview" },
+    { name: "Learn", href: "/course-generator" },
+    { name: "Interview", href: "/mock-interview" },
     { name: "Dashboard", href: "/dashboard" },
   ];
 
@@ -75,16 +75,10 @@ const Navbar = () => {
             {/* Auth Buttons - Desktop */}
             <div className="hidden md:flex items-center space-x-4">
               <Link
-                to="/signin"
-                className="px-4 py-2 text-sm font-medium text-foreground/80 hover:text-primary transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/signup"
+                to="/dashboard"
                 className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-full transition-colors"
               >
-                Sign Up
+                My Dashboard
               </Link>
             </div>
 
@@ -123,16 +117,10 @@ const Navbar = () => {
           </nav>
           <div className="flex flex-col space-y-4 pt-4 border-t border-border">
             <Link
-              to="/signin"
-              className="w-full px-4 py-3 text-center text-foreground font-medium border border-border rounded-lg hover:bg-secondary transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/signup"
+              to="/dashboard"
               className="w-full px-4 py-3 text-center text-white font-medium bg-primary hover:bg-primary/90 rounded-lg transition-colors"
             >
-              Sign Up
+              My Dashboard
             </Link>
           </div>
         </GlassMorphism>
