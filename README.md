@@ -7,10 +7,6 @@
 
 There are several ways of editing your application.
 
-**Use Lovable**
-
-Simply visit the (https://lovable.dev/projects/928371aa-9b86-4f4a-8321-488ead6f10b5) 
-
 
 
 **Use your preferred IDE**
