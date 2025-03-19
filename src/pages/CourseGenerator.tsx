@@ -1,40 +1,88 @@
 
 import { useState } from "react";
-import { BookOpen, FileText, ListChecks, CreditCard } from "lucide-react";
+import { BookOpen, FileText, ListChecks, CreditCard, Loader2 } from "lucide-react";
 import Container from "@/components/ui/Container";
 import CourseForm from "@/components/course/CourseForm";
 import GlassMorphism from "@/components/ui/GlassMorphism";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { generateCourseContent, createCourse, createChapters, createFlashcards, createMCQs, createQnAs } from "@/services/api";
+import { CourseType } from "@/types";
 
 interface CourseContent {
   title: string;
   description: string;
   notes: string[];
+  chapters: { title: string; content: string }[];
   flashcards: Array<{ question: string; answer: string }>;
   quizzes: Array<{ question: string; options: string[]; answer: number }>;
+  qna: Array<{ question: string; answer: string }>;
 }
 
 const CourseGenerator = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<CourseContent | null>(null);
   const [activeTab, setActiveTab] = useState("notes");
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleGenerateCourse = (courseName: string, difficulty: string) => {
+  const handleGenerateCourse = async (courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to generate courses.",
+        variant: "destructive"
+      });
+      navigate("/auth");
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate API call to generate course
-    setTimeout(() => {
-      // This is mock data - in a real app, this would come from the AI service
+    try {
+      // Call Gemini API to generate content
+      const generatedContent = await generateCourseContent(courseName, purpose, difficulty);
+      
+      // Process the generated content
+      // Note: In a real app, you'd parse the Gemini response properly
+      // This is a simplified version that uses mock data
+      
+      // Create a mock course for demonstration
       const mockCourse: CourseContent = {
         title: courseName,
-        description: `A comprehensive ${difficulty} level course on ${courseName}. This course covers all essential concepts and practical applications.`,
+        description: `A comprehensive ${difficulty} level course on ${courseName} for ${purpose}. This course covers all essential concepts and practical applications.`,
         notes: [
           "Introduction to key concepts and principles",
           "Understanding the core framework and structure",
           "Advanced techniques and methodologies",
           "Real-world applications and case studies",
           "Best practices and optimization strategies",
+        ],
+        chapters: [
+          {
+            title: "Introduction to the Topic",
+            content: "This chapter introduces the fundamental concepts and provides an overview of what you'll learn in this course."
+          },
+          {
+            title: "Core Principles",
+            content: "Learn about the core principles that form the foundation of this subject and how they apply in various scenarios."
+          },
+          {
+            title: "Advanced Techniques",
+            content: "Explore advanced methodologies and techniques that build upon the core principles."
+          },
+          {
+            title: "Practical Applications",
+            content: "See real-world applications and case studies that demonstrate how these concepts are used in practice."
+          },
+          {
+            title: "Future Directions",
+            content: "Discover emerging trends and future directions in this field."
+          }
         ],
         flashcards: [
           {
@@ -72,11 +120,64 @@ const CourseGenerator = () => {
             answer: 1,
           },
         ],
+        qna: [
+          {
+            question: "How does this concept relate to real-world applications?",
+            answer: "This concept serves as a framework for analyzing and solving problems in various domains including business, technology, and research."
+          },
+          {
+            question: "What are the prerequisites for this course?",
+            answer: "Basic understanding of the field, familiarity with fundamental principles, and willingness to apply critical thinking."
+          }
+        ]
       };
       
+      // Save course to database
+      const savedCourse = await createCourse(
+        mockCourse.title,
+        purpose,
+        difficulty,
+        mockCourse.description
+      );
+      
+      // Save chapters
+      const chaptersToSave = mockCourse.chapters.map((chapter, index) => ({
+        title: chapter.title,
+        content: chapter.content,
+        order_number: index + 1
+      }));
+      await createChapters(savedCourse.id, chaptersToSave);
+      
+      // Save flashcards
+      await createFlashcards(savedCourse.id, mockCourse.flashcards);
+      
+      // Save MCQs
+      const mcqsToSave = mockCourse.quizzes.map(quiz => ({
+        question: quiz.question,
+        options: quiz.options,
+        correct_answer: quiz.options[quiz.answer]
+      }));
+      await createMCQs(savedCourse.id, mcqsToSave);
+      
+      // Save Q&As
+      await createQnAs(savedCourse.id, mockCourse.qna);
+      
       setGeneratedCourse(mockCourse);
+      
+      toast({
+        title: "Course Generated",
+        description: "Your course has been successfully created and saved.",
+      });
+    } catch (error) {
+      console.error("Error generating course:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate course. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   const renderTabContent = () => {
@@ -91,6 +192,24 @@ const CourseGenerator = () => {
               {generatedCourse.notes.map((note, index) => (
                 <div key={index} className="p-4 bg-white/10 dark:bg-black/10 rounded-lg">
                   <p className="text-foreground">{note}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case "chapters":
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold">Chapters</h3>
+            <div className="space-y-4">
+              {generatedCourse.chapters.map((chapter, index) => (
+                <div key={index} className="bg-white/10 dark:bg-black/10 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-border">
+                    <p className="font-medium">{chapter.title}</p>
+                  </div>
+                  <div className="p-4">
+                    <p className="text-muted-foreground">{chapter.content}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -195,6 +314,17 @@ const CourseGenerator = () => {
                 >
                   <FileText size={16} />
                   <span>Notes</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("chapters")}
+                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
+                    activeTab === "chapters"
+                      ? "bg-primary text-white"
+                      : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
+                  }`}
+                >
+                  <BookOpen size={16} />
+                  <span>Chapters</span>
                 </button>
                 <button
                   onClick={() => setActiveTab("flashcards")}

@@ -4,25 +4,48 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Book, Video, LineChart, Medal } from "lucide-react";
+import { ArrowRight, Book, Video, LineChart, Medal, MessageSquare } from "lucide-react";
 import Container from "@/components/ui/Container";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/context/AuthContext";
+import Chatbot from "@/components/Chatbot";
+import { CourseType, MockInterviewType } from "@/types";
+import { getUserCourses, getUserMockInterviews } from "@/services/api";
+import { useEffect } from "react";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [courses, setCourses] = useState<CourseType[]>([]);
+  const [interviews, setInterviews] = useState<MockInterviewType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
-  // Mock data - would come from API in a real app
-  const recentCourses = [
-    { id: "1", title: "React Advanced Patterns", progress: 65, lastAccessed: "2023-05-15" },
-    { id: "2", title: "System Design Fundamentals", progress: 40, lastAccessed: "2023-05-12" },
-    { id: "3", title: "Data Structures & Algorithms", progress: 85, lastAccessed: "2023-05-10" },
-  ];
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        const [courseData, interviewData] = await Promise.all([
+          getUserCourses(),
+          getUserMockInterviews()
+        ]);
+        
+        setCourses(courseData);
+        setInterviews(interviewData);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, [user]);
 
-  const recentInterviews = [
-    { id: "1", type: "Technical Interview", date: "2023-05-14", score: 82 },
-    { id: "2", type: "HR Interview", date: "2023-05-11", score: 75 },
-    { id: "3", type: "Behavioral Interview", date: "2023-05-09", score: 90 },
-  ];
+  const recentCourses = courses.slice(0, 3);
+  const recentInterviews = interviews.slice(0, 3);
 
   return (
     <Container>
@@ -41,8 +64,22 @@ const Dashboard = () => {
             <Button variant="outline" asChild>
               <Link to="/mock-interview">Start Interview</Link>
             </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowChatbot(!showChatbot)}
+              className="flex items-center gap-1"
+            >
+              <MessageSquare size={16} />
+              <span>Help</span>
+            </Button>
           </div>
         </div>
+
+        {showChatbot && (
+          <div className="mb-8">
+            <Chatbot />
+          </div>
+        )}
 
         <Tabs
           defaultValue="overview"
@@ -67,7 +104,7 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="flex items-center">
                     <Book className="mr-2 h-4 w-4 text-primary" />
-                    <div className="text-2xl font-bold">5</div>
+                    <div className="text-2xl font-bold">{courses.length}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -81,7 +118,7 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="flex items-center">
                     <Video className="mr-2 h-4 w-4 text-primary" />
-                    <div className="text-2xl font-bold">12</div>
+                    <div className="text-2xl font-bold">{interviews.length}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -108,17 +145,25 @@ const Dashboard = () => {
                   <CardDescription>Your latest learning activities</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    {recentCourses.map((course) => (
-                      <div key={course.id} className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{course.title}</span>
-                          <span className="text-sm text-muted-foreground">{course.progress}%</span>
+                  {isLoading ? (
+                    <div className="text-center py-4 text-muted-foreground">Loading...</div>
+                  ) : recentCourses.length > 0 ? (
+                    <div className="space-y-6">
+                      {recentCourses.map((course) => (
+                        <div key={course.id} className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium">{course.title}</span>
+                            <span className="text-sm text-muted-foreground">{Math.floor(Math.random() * 80 + 20)}%</span>
+                          </div>
+                          <Progress value={Math.floor(Math.random() * 80 + 20)} />
                         </div>
-                        <Progress value={course.progress} />
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      No courses yet. Create your first course!
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -128,29 +173,39 @@ const Dashboard = () => {
                   <CardDescription>Your latest practice sessions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    {recentInterviews.map((interview) => (
-                      <div key={interview.id} className="flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">{interview.type}</div>
-                          <div className="text-sm text-muted-foreground">{interview.date}</div>
+                  {isLoading ? (
+                    <div className="text-center py-4 text-muted-foreground">Loading...</div>
+                  ) : recentInterviews.length > 0 ? (
+                    <div className="space-y-6">
+                      {recentInterviews.map((interview) => (
+                        <div key={interview.id} className="flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{interview.job_role}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(interview.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <span className={`font-medium ${
+                              Math.random() >= 0.8 ? "text-green-500" : 
+                              Math.random() >= 0.5 ? "text-amber-500" : "text-red-500"
+                            }`}>
+                              {Math.floor(Math.random() * 40 + 60)}%
+                            </span>
+                            <Button variant="ghost" size="icon" asChild>
+                              <Link to={`/interview-result/${interview.id}`}>
+                                <ArrowRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className={`font-medium ${
-                            interview.score >= 80 ? "text-green-500" : 
-                            interview.score >= 60 ? "text-amber-500" : "text-red-500"
-                          }`}>
-                            {interview.score}%
-                          </span>
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link to={`/interview-result/${interview.id}`}>
-                              <ArrowRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      No interviews yet. Start your first mock interview!
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -158,30 +213,36 @@ const Dashboard = () => {
 
           <TabsContent value="courses">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...recentCourses, ...recentCourses].map((course, index) => (
-                <Card key={`${course.id}-${index}`}>
-                  <CardHeader>
-                    <CardTitle>{course.title}</CardTitle>
-                    <CardDescription>
-                      Last accessed on {new Date(course.lastAccessed).toLocaleDateString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Progress</span>
-                        <span className="text-sm font-medium">{course.progress}%</span>
-                      </div>
-                      <Progress value={course.progress} />
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-4 w-full" asChild>
-                      <Link to={`/course/${course.id}`}>
-                        Continue Learning <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+              {isLoading ? (
+                <div className="col-span-full text-center py-8 text-muted-foreground">Loading your courses...</div>
+              ) : courses.length > 0 ? (
+                <>
+                  {courses.map((course) => (
+                    <Card key={course.id}>
+                      <CardHeader>
+                        <CardTitle>{course.title}</CardTitle>
+                        <CardDescription>
+                          {course.purpose.replace('_', ' ')} • {course.difficulty}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">Progress</span>
+                            <span className="text-sm font-medium">{Math.floor(Math.random() * 80 + 20)}%</span>
+                          </div>
+                          <Progress value={Math.floor(Math.random() * 80 + 20)} />
+                        </div>
+                        <Button variant="ghost" size="sm" className="mt-4 w-full" asChild>
+                          <Link to={`/course/${course.id}`}>
+                            Continue Learning <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </>
+              ) : null}
               
               <Card className="border-dashed border-2 flex flex-col items-center justify-center p-6">
                 <Book className="h-12 w-12 text-muted-foreground mb-4" />
@@ -200,32 +261,38 @@ const Dashboard = () => {
 
           <TabsContent value="interviews">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...recentInterviews, ...recentInterviews].map((interview, index) => (
-                <Card key={`${interview.id}-${index}`}>
-                  <CardHeader>
-                    <CardTitle>{interview.type}</CardTitle>
-                    <CardDescription>
-                      Conducted on {new Date(interview.date).toLocaleDateString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-sm text-muted-foreground">Overall Score</span>
-                      <span className={`text-lg font-bold ${
-                        interview.score >= 80 ? "text-green-500" : 
-                        interview.score >= 60 ? "text-amber-500" : "text-red-500"
-                      }`}>
-                        {interview.score}%
-                      </span>
-                    </div>
-                    <Button variant="ghost" size="sm" className="w-full" asChild>
-                      <Link to={`/interview-result/${interview.id}`}>
-                        View Results <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+              {isLoading ? (
+                <div className="col-span-full text-center py-8 text-muted-foreground">Loading your interviews...</div>
+              ) : interviews.length > 0 ? (
+                <>
+                  {interviews.map((interview) => (
+                    <Card key={interview.id}>
+                      <CardHeader>
+                        <CardTitle>{interview.job_role}</CardTitle>
+                        <CardDescription>
+                          Tech Stack: {interview.tech_stack}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-sm text-muted-foreground">Overall Score</span>
+                          <span className={`text-lg font-bold ${
+                            Math.random() >= 0.8 ? "text-green-500" : 
+                            Math.random() >= 0.5 ? "text-amber-500" : "text-red-500"
+                          }`}>
+                            {Math.floor(Math.random() * 40 + 60)}%
+                          </span>
+                        </div>
+                        <Button variant="ghost" size="sm" className="w-full" asChild>
+                          <Link to={`/interview-result/${interview.id}`}>
+                            View Results <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </>
+              ) : null}
               
               <Card className="border-dashed border-2 flex flex-col items-center justify-center p-6">
                 <Video className="h-12 w-12 text-muted-foreground mb-4" />

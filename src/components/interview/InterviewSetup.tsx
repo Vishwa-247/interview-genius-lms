@@ -5,9 +5,10 @@ import GlassMorphism from "../ui/GlassMorphism";
 
 interface InterviewSetupProps {
   onSubmit: (role: string, techStack: string, experience: string) => void;
+  isLoading?: boolean;
 }
 
-const InterviewSetup = ({ onSubmit }: InterviewSetupProps) => {
+const InterviewSetup = ({ onSubmit, isLoading = false }: InterviewSetupProps) => {
   const [role, setRole] = useState("");
   const [techStack, setTechStack] = useState("");
   const [experience, setExperience] = useState("1-3");
@@ -137,14 +138,14 @@ const InterviewSetup = ({ onSubmit }: InterviewSetupProps) => {
 
         <button
           type="submit"
-          disabled={!role.trim() || !techStack.trim()}
+          disabled={isLoading || !role.trim() || !techStack.trim()}
           className={`w-full px-6 py-3 text-white font-medium bg-primary rounded-lg transition-all ${
-            !role.trim() || !techStack.trim()
+            !role.trim() || !techStack.trim() || isLoading
               ? "opacity-70 cursor-not-allowed"
               : "hover:bg-primary/90"
           }`}
         >
-          Start Mock Interview
+          {isLoading ? "Setting Up Interview..." : "Start Mock Interview"}
         </button>
       </form>
     </GlassMorphism>
