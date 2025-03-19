@@ -20,10 +20,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Helper to check connection
+// Helper to check connection - using a safer approach that doesn't specify a table
 export const checkSupabaseConnection = async () => {
   try {
-    const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
+    // Just check if we can connect at all by retrieving auth status
+    const { data, error } = await supabase.auth.getSession();
     return !error;
   } catch {
     return false;
