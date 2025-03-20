@@ -132,7 +132,7 @@ const CourseGenerator = () => {
         ]
       };
       
-      // Save course to database - now passing the user ID as the 5th argument
+      // Save course to database - now passing the user ID
       const savedCourse = await createCourse(
         mockCourse.title,
         purpose,
@@ -152,7 +152,7 @@ const CourseGenerator = () => {
       // Save flashcards
       await createFlashcards(savedCourse.id, mockCourse.flashcards);
       
-      // Save MCQs - updated to use createMcqs instead of createMCQs
+      // Save MCQs
       const mcqsToSave = mockCourse.quizzes.map(quiz => ({
         question: quiz.question,
         options: quiz.options,
@@ -160,7 +160,7 @@ const CourseGenerator = () => {
       }));
       await createMcqs(savedCourse.id, mcqsToSave);
       
-      // Save Q&As - updated to use createQnas instead of createQnAs
+      // Save Q&As
       await createQnas(savedCourse.id, mockCourse.qna);
       
       setGeneratedCourse(mockCourse);

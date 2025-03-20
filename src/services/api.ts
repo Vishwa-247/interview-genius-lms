@@ -2,10 +2,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
-// Type assertion helper to work around typing issues
+// More aggressive type assertion helper to work around typing issues with empty Database definition
 const fromTable = <T>(tableName: string) => {
-  // @ts-ignore - We're using type assertion to overcome type limitations
-  return supabase.from(tableName);
+  // Use a complete type assertion to bypass the Database type checks
+  return supabase.from(tableName) as any;
 };
 
 // Course APIs
@@ -28,7 +28,7 @@ export const createCourse = async (
     .single();
 
   if (error) throw error;
-  return data as unknown as CourseType;
+  return data as CourseType;
 };
 
 export const getCourseById = async (courseId: string): Promise<CourseType> => {
@@ -38,7 +38,7 @@ export const getCourseById = async (courseId: string): Promise<CourseType> => {
     .single();
 
   if (error) throw error;
-  return data as unknown as CourseType;
+  return data as CourseType;
 };
 
 export const getAllCourses = async (userId: string): Promise<CourseType[]> => {
@@ -48,7 +48,7 @@ export const getAllCourses = async (userId: string): Promise<CourseType[]> => {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data as unknown as CourseType[];
+  return data as CourseType[];
 };
 
 // Added function for Dashboard.tsx
@@ -74,7 +74,7 @@ export const createChapters = async (
     .select();
 
   if (error) throw error;
-  return data as unknown as ChapterType[];
+  return data as ChapterType[];
 };
 
 export const getChaptersByCourseId = async (courseId: string): Promise<ChapterType[]> => {
@@ -84,7 +84,7 @@ export const getChaptersByCourseId = async (courseId: string): Promise<ChapterTy
     .order('order_number', { ascending: true });
 
   if (error) throw error;
-  return data as unknown as ChapterType[];
+  return data as ChapterType[];
 };
 
 // Flashcard APIs
@@ -102,7 +102,7 @@ export const createFlashcards = async (
     .select();
 
   if (error) throw error;
-  return data as unknown as FlashcardType[];
+  return data as FlashcardType[];
 };
 
 export const getFlashcardsByCourseId = async (courseId: string): Promise<FlashcardType[]> => {
@@ -111,7 +111,7 @@ export const getFlashcardsByCourseId = async (courseId: string): Promise<Flashca
     .eq('course_id', courseId);
 
   if (error) throw error;
-  return data as unknown as FlashcardType[];
+  return data as FlashcardType[];
 };
 
 // MCQ APIs
@@ -131,7 +131,7 @@ export const createMcqs = async (
     .select();
 
   if (error) throw error;
-  return data as unknown as McqType[];
+  return data as McqType[];
 };
 
 export const getMcqsByCourseId = async (courseId: string): Promise<McqType[]> => {
@@ -142,7 +142,7 @@ export const getMcqsByCourseId = async (courseId: string): Promise<McqType[]> =>
   if (error) throw error;
   
   // Process the options back from JSON if needed
-  return data as unknown as McqType[];
+  return data as McqType[];
 };
 
 // Q&A APIs
@@ -160,7 +160,7 @@ export const createQnas = async (
     .select();
 
   if (error) throw error;
-  return data as unknown as QnaType[];
+  return data as QnaType[];
 };
 
 export const getQnasByCourseId = async (courseId: string): Promise<QnaType[]> => {
@@ -169,7 +169,7 @@ export const getQnasByCourseId = async (courseId: string): Promise<QnaType[]> =>
     .eq('course_id', courseId);
 
   if (error) throw error;
-  return data as unknown as QnaType[];
+  return data as QnaType[];
 };
 
 // Mock Interview APIs
@@ -192,7 +192,7 @@ export const createMockInterview = async (
     .single();
 
   if (error) throw error;
-  return data as unknown as MockInterviewType;
+  return data as MockInterviewType;
 };
 
 // Added function for Dashboard.tsx
@@ -206,7 +206,7 @@ export const getUserMockInterviews = async (): Promise<MockInterviewType[]> => {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data as unknown as MockInterviewType[];
+  return data as MockInterviewType[];
 };
 
 export const getMockInterviewById = async (interviewId: string): Promise<MockInterviewType> => {
@@ -216,14 +216,14 @@ export const getMockInterviewById = async (interviewId: string): Promise<MockInt
     .single();
 
   if (error) throw error;
-  return data as unknown as MockInterviewType;
+  return data as MockInterviewType;
 };
 
 export const updateMockInterviewCompleted = async (interviewId: string): Promise<void> => {
   const { error } = await fromTable<MockInterviewType>('mock_interviews')
     .update({
       completed_at: new Date().toISOString()
-    })
+    } as any)
     .eq('id', interviewId);
 
   if (error) throw error;
@@ -245,11 +245,11 @@ export const createInterviewQuestions = async (
   }));
 
   const { data, error } = await fromTable<InterviewQuestionType>('interview_questions')
-    .insert(questionsWithInterviewId)
+    .insert(questionsWithInterviewId as any)
     .select();
 
   if (error) throw error;
-  return data as unknown as InterviewQuestionType[];
+  return data as InterviewQuestionType[];
 };
 
 export const getInterviewQuestionsByInterviewId = async (interviewId: string): Promise<InterviewQuestionType[]> => {
@@ -259,14 +259,14 @@ export const getInterviewQuestionsByInterviewId = async (interviewId: string): P
     .order('order_number', { ascending: true });
 
   if (error) throw error;
-  return data as unknown as InterviewQuestionType[];
+  return data as InterviewQuestionType[];
 };
 
 export const updateInterviewQuestionAnswer = async (questionId: string, answer: string): Promise<void> => {
   const { error } = await fromTable<InterviewQuestionType>('interview_questions')
     .update({
       user_answer: answer
-    })
+    } as any)
     .eq('id', questionId);
 
   if (error) throw error;
@@ -298,12 +298,12 @@ export const createInterviewAnalysis = async (
       technical_feedback: technicalFeedback,
       language_feedback: languageFeedback,
       course_recommendations: courseRecommendations
-    })
+    } as any)
     .select()
     .single();
 
   if (error) throw error;
-  return data as unknown as InterviewAnalysisType;
+  return data as InterviewAnalysisType;
 };
 
 export const getInterviewAnalysisByInterviewId = async (interviewId: string): Promise<InterviewAnalysisType> => {
@@ -313,7 +313,7 @@ export const getInterviewAnalysisByInterviewId = async (interviewId: string): Pr
     .single();
 
   if (error) throw error;
-  return data as unknown as InterviewAnalysisType;
+  return data as InterviewAnalysisType;
 };
 
 // Gemini API integration
