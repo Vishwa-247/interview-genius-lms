@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -60,8 +59,8 @@ const MockInterview = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isCourseTabActive, setIsCourseTabActive] = useState(false);
   const [isGeneratingCourse, setIsGeneratingCourse] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
-  // Sample mock interview data
   const sampleQuestions = [
     "Explain the concept of state management in React and compare different approaches.",
     "How would you optimize the performance of a React application?",
@@ -82,7 +81,6 @@ const MockInterview = () => {
         return;
       }
 
-      // Create the interview in the database
       const { data: interviewData, error: interviewError } = await supabase
         .from('mock_interviews')
         .insert({
@@ -98,7 +96,6 @@ const MockInterview = () => {
 
       setInterviewData(interviewData);
 
-      // Generate questions (simulated for now)
       const generatedQuestions = sampleQuestions.map((question, index) => ({
         id: `q-${index}`,
         interview_id: interviewData.id,
@@ -108,14 +105,12 @@ const MockInterview = () => {
         created_at: new Date().toISOString(),
       }));
 
-      // Insert questions to database
       const { error: questionsError } = await supabase
         .from('interview_questions')
         .insert(generatedQuestions);
 
       if (questionsError) throw questionsError;
 
-      // Fetch the questions back to ensure they're stored correctly
       await fetchInterviewQuestions(interviewData.id);
       
       setStage(InterviewStage.Questions);
@@ -158,13 +153,6 @@ const MockInterview = () => {
   };
 
   const handleAnswerSubmitted = (blob: Blob) => {
-    // In a real implementation, this would:
-    // 1. Upload the recording to storage
-    // 2. Update the question with the answer URL
-    // 3. Process the recording for facial expressions
-    // 4. Analyze the answer with AI
-    
-    // For now, we'll just simulate moving to the next question
     toast({
       title: "Answer Recorded",
       description: "Your answer has been recorded successfully.",
@@ -177,16 +165,9 @@ const MockInterview = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      // This is the last question, complete the interview
       setStage(InterviewStage.Complete);
       
-      // In a real implementation, this would:
-      // 1. Mark the interview as completed in the database
-      // 2. Generate the analysis
-      // 3. Redirect to the results page
-      
       setTimeout(() => {
-        // Simulate completing the interview and redirecting to results
         toast({
           title: "Interview Completed",
           description: "Your interview has been completed. Preparing your results...",
@@ -202,7 +183,6 @@ const MockInterview = () => {
   const handleSubmitCourse = async (courseName: string, purpose: string, difficulty: string) => {
     setIsGeneratingCourse(true);
     
-    // Simulate API call delay
     setTimeout(() => {
       toast({
         title: "Course Generation Started",
@@ -217,6 +197,18 @@ const MockInterview = () => {
         });
       }, 3000);
     }, 1500);
+  };
+
+  const startRecording = () => {
+    setIsRecording(true);
+  };
+  
+  const stopRecording = () => {
+    setIsRecording(false);
+  };
+  
+  const handleCancel = () => {
+    setStage(InterviewStage.Questions);
   };
 
   const renderStage = () => {
@@ -287,9 +279,20 @@ const MockInterview = () => {
             </div>
             
             <VideoRecorder 
-              onSubmit={handleAnswerSubmitted}
-              onCancel={() => setStage(InterviewStage.Questions)}
+              onRecordingComplete={handleAnswerSubmitted}
+              isRecording={isRecording}
+              startRecording={startRecording}
+              stopRecording={stopRecording}
             />
+            
+            <div className="mt-6 flex justify-center">
+              <Button 
+                variant="outline" 
+                onClick={handleCancel}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         );
       
@@ -454,3 +457,4 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
+
