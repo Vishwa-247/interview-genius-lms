@@ -49,10 +49,34 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Layout><Index /></Layout>} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/course-generator" element={<Layout><CourseGenerator /></Layout>} />
-            <Route path="/course/:id" element={<Layout><CourseDetail /></Layout>} />
-            <Route path="/mock-interview" element={<Layout><MockInterview /></Layout>} />
-            <Route path="/interview-result/:id" element={<Layout><InterviewResult /></Layout>} />
+            <Route path="/course-generator" element={
+              <Layout>
+                <ProtectedRoute>
+                  <CourseGenerator />
+                </ProtectedRoute>
+              </Layout>
+            } />
+            <Route path="/course/:id" element={
+              <Layout>
+                <ProtectedRoute>
+                  <CourseDetail />
+                </ProtectedRoute>
+              </Layout>
+            } />
+            <Route path="/mock-interview" element={
+              <Layout>
+                <ProtectedRoute>
+                  <MockInterview />
+                </ProtectedRoute>
+              </Layout>
+            } />
+            <Route path="/interview-result/:id" element={
+              <Layout>
+                <ProtectedRoute>
+                  <InterviewResult />
+                </ProtectedRoute>
+              </Layout>
+            } />
             <Route 
               path="/dashboard" 
               element={

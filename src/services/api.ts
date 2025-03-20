@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
@@ -46,8 +47,11 @@ export const getAllCourses = async (userId: string): Promise<CourseType[]> => {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data as CourseType[];
+  if (error) {
+    console.error("Error fetching courses:", error);
+    return [];
+  }
+  return data as CourseType[] || [];
 };
 
 // Added function for Dashboard.tsx
@@ -185,8 +189,9 @@ export const createMockInterview = async (
       job_role: jobRole,
       tech_stack: techStack,
       experience: experience,
-      user_id: userData.user.id
-    } as any)
+      user_id: userData.user.id,
+      completed: false
+    })
     .select()
     .single();
 
@@ -204,8 +209,11 @@ export const getUserMockInterviews = async (): Promise<MockInterviewType[]> => {
     .eq('user_id', userData.user.id)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data as MockInterviewType[];
+  if (error) {
+    console.error("Error fetching interviews:", error);
+    return [];
+  }
+  return data as MockInterviewType[] || [];
 };
 
 export const getMockInterviewById = async (interviewId: string): Promise<MockInterviewType> => {
@@ -221,8 +229,8 @@ export const getMockInterviewById = async (interviewId: string): Promise<MockInt
 export const updateMockInterviewCompleted = async (interviewId: string): Promise<void> => {
   const { error } = await fromTable<MockInterviewType>('mock_interviews')
     .update({
-      completed_at: new Date().toISOString()
-    } as any)
+      completed: true
+    })
     .eq('id', interviewId);
 
   if (error) throw error;
@@ -240,11 +248,11 @@ export const createInterviewQuestions = async (
     interview_id: interviewId,
     order_number: q.order_number,
     question: q.question,
-    user_answer: null // Make user_answer nullable to match interface
+    user_answer: null
   }));
 
   const { data, error } = await fromTable<InterviewQuestionType>('interview_questions')
-    .insert(questionsWithInterviewId as any)
+    .insert(questionsWithInterviewId)
     .select();
 
   if (error) throw error;
@@ -265,7 +273,7 @@ export const updateInterviewQuestionAnswer = async (questionId: string, answer: 
   const { error } = await fromTable<InterviewQuestionType>('interview_questions')
     .update({
       user_answer: answer
-    } as any)
+    })
     .eq('id', questionId);
 
   if (error) throw error;
@@ -293,12 +301,12 @@ export const createInterviewAnalysis = async (
   const { data, error } = await fromTable<InterviewAnalysisType>('interview_analysis')
     .insert({
       interview_id: interviewId,
-      facial_expression_data: facialExpressionData,
+      facial_data: facialExpressionData,
       pronunciation_feedback: pronunciationFeedback,
       technical_feedback: technicalFeedback,
       language_feedback: languageFeedback,
-      course_recommendations: courseRecommendations
-    } as any)
+      recommendations: courseRecommendations
+    })
     .select()
     .single();
 

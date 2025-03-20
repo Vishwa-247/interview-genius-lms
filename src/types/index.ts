@@ -7,7 +7,6 @@ export type CourseType = {
   difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
   summary?: string;
   created_at: string;
-  updated_at: string;
 };
 
 export type ChapterType = {
@@ -52,7 +51,7 @@ export type MockInterviewType = {
   tech_stack: string;
   experience: string;
   created_at: string;
-  completed_at: string | null;
+  completed: boolean;
 };
 
 export type InterviewQuestionType = {
@@ -67,16 +66,17 @@ export type InterviewQuestionType = {
 export type InterviewAnalysisType = {
   id: string;
   interview_id: string;
-  facial_expression_data: {
+  facial_data: {
     confident: number;
     stressed: number;
     hesitant: number;
     nervous: number;
+    excited: number;
   };
   pronunciation_feedback: string;
   technical_feedback: string;
   language_feedback: string;
-  course_recommendations: {
+  recommendations: {
     title: string;
     description: string;
     link?: string;

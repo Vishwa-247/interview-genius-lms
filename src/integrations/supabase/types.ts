@@ -9,7 +9,142 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      courses: {
+        Row: {
+          content: Json | null
+          created_at: string
+          difficulty: string
+          id: string
+          purpose: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string
+          difficulty: string
+          id?: string
+          purpose: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string
+          difficulty?: string
+          id?: string
+          purpose?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      interview_analysis: {
+        Row: {
+          created_at: string
+          facial_data: Json | null
+          id: string
+          interview_id: string
+          language_feedback: string | null
+          pronunciation_feedback: string | null
+          recommendations: Json | null
+          technical_feedback: string | null
+        }
+        Insert: {
+          created_at?: string
+          facial_data?: Json | null
+          id?: string
+          interview_id: string
+          language_feedback?: string | null
+          pronunciation_feedback?: string | null
+          recommendations?: Json | null
+          technical_feedback?: string | null
+        }
+        Update: {
+          created_at?: string
+          facial_data?: Json | null
+          id?: string
+          interview_id?: string
+          language_feedback?: string | null
+          pronunciation_feedback?: string | null
+          recommendations?: Json | null
+          technical_feedback?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_analysis_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "mock_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interview_questions: {
+        Row: {
+          created_at: string
+          id: string
+          interview_id: string
+          order_number: number
+          question: string
+          user_answer: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interview_id: string
+          order_number: number
+          question: string
+          user_answer?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interview_id?: string
+          order_number?: number
+          question?: string
+          user_answer?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_questions_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "mock_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mock_interviews: {
+        Row: {
+          completed: boolean | null
+          created_at: string
+          experience: string
+          id: string
+          job_role: string
+          tech_stack: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string
+          experience: string
+          id?: string
+          job_role: string
+          tech_stack: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string
+          experience?: string
+          id?: string
+          job_role?: string
+          tech_stack?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

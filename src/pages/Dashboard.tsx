@@ -1,17 +1,17 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Book, Video, LineChart, Medal, MessageSquare } from "lucide-react";
+import { ArrowRight, Book, Video, Medal, MessageSquare } from "lucide-react";
 import Container from "@/components/ui/Container";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/AuthContext";
 import Chatbot from "@/components/Chatbot";
 import { CourseType, MockInterviewType } from "@/types";
 import { getUserCourses, getUserMockInterviews } from "@/services/api";
-import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [interviews, setInterviews] = useState<MockInterviewType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -27,37 +28,60 @@ const Dashboard = () => {
       
       try {
         setIsLoading(true);
-        const [courseData, interviewData] = await Promise.all([
-          getUserCourses(),
-          getUserMockInterviews()
-        ]);
         
+        // Handle courses
+        const courseData = await getUserCourses();
         setCourses(courseData);
+        
+        // Handle interviews
+        const interviewData = await getUserMockInterviews();
         setInterviews(interviewData);
+
       } catch (error) {
         console.error("Error fetching user data:", error);
+        toast({
+          title: "Error loading data",
+          description: "There was a problem loading your courses and interviews.",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchUserData();
-  }, [user]);
+  }, [user, toast]);
 
-  const recentCourses = courses.slice(0, 3);
-  const recentInterviews = interviews.slice(0, 3);
+  // Create mock data if there's no real data
+  const mockCourses = [
+    { id: "mock1", title: "React Fundamentals", purpose: "job_interview", difficulty: "intermediate", created_at: new Date().toISOString(), user_id: "mock-user" },
+    { id: "mock2", title: "Data Structures", purpose: "coding_preparation", difficulty: "advanced", created_at: new Date().toISOString(), user_id: "mock-user" },
+    { id: "mock3", title: "System Design", purpose: "practice", difficulty: "expert", created_at: new Date().toISOString(), user_id: "mock-user" },
+  ] as CourseType[];
+
+  const mockInterviews = [
+    { id: "mock1", job_role: "Frontend Developer", tech_stack: "React, TypeScript", experience: "3-5", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+    { id: "mock2", job_role: "Full Stack Engineer", tech_stack: "Node.js, Express, MongoDB", experience: "1-3", created_at: new Date().toISOString(), user_id: "mock-user", completed: false },
+    { id: "mock3", job_role: "Data Scientist", tech_stack: "Python, TensorFlow, PyTorch", experience: "5+", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+  ] as MockInterviewType[];
+
+  const displayCourses = courses.length > 0 ? courses : (isLoading ? [] : mockCourses);
+  const displayInterviews = interviews.length > 0 ? interviews : (isLoading ? [] : mockInterviews);
+
+  const recentCourses = displayCourses.slice(0, 3);
+  const recentInterviews = displayInterviews.slice(0, 3);
 
   return (
     <Container>
       <div className="py-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight">StudyMate Dashboard</h1>
             <p className="text-muted-foreground mt-1">
               Track your learning progress and interview performance
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button asChild>
               <Link to="/course-generator">Create Course</Link>
             </Button>
@@ -87,7 +111,7 @@ const Dashboard = () => {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid grid-cols-3 w-full max-w-md">
+          <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="interviews">Interviews</TabsTrigger>
@@ -104,7 +128,7 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="flex items-center">
                     <Book className="mr-2 h-4 w-4 text-primary" />
-                    <div className="text-2xl font-bold">{courses.length}</div>
+                    <div className="text-2xl font-bold">{displayCourses.length}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -118,7 +142,7 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="flex items-center">
                     <Video className="mr-2 h-4 w-4 text-primary" />
-                    <div className="text-2xl font-bold">{interviews.length}</div>
+                    <div className="text-2xl font-bold">{displayInterviews.length}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -215,33 +239,31 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {isLoading ? (
                 <div className="col-span-full text-center py-8 text-muted-foreground">Loading your courses...</div>
-              ) : courses.length > 0 ? (
-                <>
-                  {courses.map((course) => (
-                    <Card key={course.id}>
-                      <CardHeader>
-                        <CardTitle>{course.title}</CardTitle>
-                        <CardDescription>
-                          {course.purpose.replace('_', ' ')} • {course.difficulty}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Progress</span>
-                            <span className="text-sm font-medium">{Math.floor(Math.random() * 80 + 20)}%</span>
-                          </div>
-                          <Progress value={Math.floor(Math.random() * 80 + 20)} />
+              ) : displayCourses.length > 0 ? (
+                displayCourses.map((course) => (
+                  <Card key={course.id}>
+                    <CardHeader>
+                      <CardTitle>{course.title}</CardTitle>
+                      <CardDescription>
+                        {course.purpose.replace('_', ' ')} • {course.difficulty}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Progress</span>
+                          <span className="text-sm font-medium">{Math.floor(Math.random() * 80 + 20)}%</span>
                         </div>
-                        <Button variant="ghost" size="sm" className="mt-4 w-full" asChild>
-                          <Link to={`/course/${course.id}`}>
-                            Continue Learning <ArrowRight className="ml-2 h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </>
+                        <Progress value={Math.floor(Math.random() * 80 + 20)} />
+                      </div>
+                      <Button variant="ghost" size="sm" className="mt-4 w-full" asChild>
+                        <Link to={`/course/${course.id}`}>
+                          Continue Learning <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))
               ) : null}
               
               <Card className="border-dashed border-2 flex flex-col items-center justify-center p-6">
@@ -263,35 +285,41 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {isLoading ? (
                 <div className="col-span-full text-center py-8 text-muted-foreground">Loading your interviews...</div>
-              ) : interviews.length > 0 ? (
-                <>
-                  {interviews.map((interview) => (
-                    <Card key={interview.id}>
-                      <CardHeader>
-                        <CardTitle>{interview.job_role}</CardTitle>
-                        <CardDescription>
-                          Tech Stack: {interview.tech_stack}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex justify-between items-center mb-4">
-                          <span className="text-sm text-muted-foreground">Overall Score</span>
-                          <span className={`text-lg font-bold ${
-                            Math.random() >= 0.8 ? "text-green-500" : 
-                            Math.random() >= 0.5 ? "text-amber-500" : "text-red-500"
-                          }`}>
-                            {Math.floor(Math.random() * 40 + 60)}%
-                          </span>
-                        </div>
-                        <Button variant="ghost" size="sm" className="w-full" asChild>
-                          <Link to={`/interview-result/${interview.id}`}>
-                            View Results <ArrowRight className="ml-2 h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </>
+              ) : displayInterviews.length > 0 ? (
+                displayInterviews.map((interview) => (
+                  <Card key={interview.id}>
+                    <CardHeader>
+                      <CardTitle>{interview.job_role}</CardTitle>
+                      <CardDescription>
+                        Tech Stack: {interview.tech_stack}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-sm text-muted-foreground">Status</span>
+                        <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                          interview.completed ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {interview.completed ? "Completed" : "In Progress"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-sm text-muted-foreground">Overall Score</span>
+                        <span className={`text-lg font-bold ${
+                          Math.random() >= 0.8 ? "text-green-500" : 
+                          Math.random() >= 0.5 ? "text-amber-500" : "text-red-500"
+                        }`}>
+                          {Math.floor(Math.random() * 40 + 60)}%
+                        </span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="w-full" asChild>
+                        <Link to={`/interview-result/${interview.id}`}>
+                          View Results <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))
               ) : null}
               
               <Card className="border-dashed border-2 flex flex-col items-center justify-center p-6">
