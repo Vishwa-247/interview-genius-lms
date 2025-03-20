@@ -1,10 +1,9 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
 // More aggressive type assertion helper to work around typing issues with empty Database definition
 const fromTable = <T>(tableName: string) => {
-  // Use a complete type assertion to bypass the Database type checks
+  // Create a completely type-unsafe client for the specific table
   return supabase.from(tableName) as any;
 };
 
@@ -187,7 +186,7 @@ export const createMockInterview = async (
       tech_stack: techStack,
       experience: experience,
       user_id: userData.user.id
-    })
+    } as any)
     .select()
     .single();
 
