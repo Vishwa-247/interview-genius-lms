@@ -57,12 +57,18 @@ const Dashboard = () => {
     { id: "mock1", title: "React Fundamentals", purpose: "job_interview", difficulty: "intermediate", created_at: new Date().toISOString(), user_id: "mock-user" },
     { id: "mock2", title: "Data Structures", purpose: "coding_preparation", difficulty: "advanced", created_at: new Date().toISOString(), user_id: "mock-user" },
     { id: "mock3", title: "System Design", purpose: "practice", difficulty: "expert", created_at: new Date().toISOString(), user_id: "mock-user" },
+    { id: "mock4", title: "TypeScript Mastery", purpose: "job_interview", difficulty: "intermediate", created_at: new Date().toISOString(), user_id: "mock-user" },
+    { id: "mock5", title: "Machine Learning Basics", purpose: "exam", difficulty: "beginner", created_at: new Date().toISOString(), user_id: "mock-user" },
+    { id: "mock6", title: "Cloud Architecture", purpose: "practice", difficulty: "advanced", created_at: new Date().toISOString(), user_id: "mock-user" },
   ] as CourseType[];
 
   const mockInterviews = [
     { id: "mock1", job_role: "Frontend Developer", tech_stack: "React, TypeScript", experience: "3-5", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
     { id: "mock2", job_role: "Full Stack Engineer", tech_stack: "Node.js, Express, MongoDB", experience: "1-3", created_at: new Date().toISOString(), user_id: "mock-user", completed: false },
     { id: "mock3", job_role: "Data Scientist", tech_stack: "Python, TensorFlow, PyTorch", experience: "5+", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+    { id: "mock4", job_role: "DevOps Engineer", tech_stack: "Docker, Kubernetes, AWS", experience: "3-5", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+    { id: "mock5", job_role: "Mobile Developer", tech_stack: "Flutter, Dart, Firebase", experience: "1-3", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+    { id: "mock6", job_role: "Backend Engineer", tech_stack: "Java, Spring Boot, MySQL", experience: "5+", created_at: new Date().toISOString(), user_id: "mock-user", completed: false },
   ] as MockInterviewType[];
 
   const displayCourses = courses.length > 0 ? courses : (isLoading ? [] : mockCourses);
@@ -73,7 +79,7 @@ const Dashboard = () => {
 
   return (
     <Container>
-      <div className="py-6">
+      <div className="py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">StudyMate Dashboard</h1>
@@ -182,6 +188,11 @@ const Dashboard = () => {
                           <Progress value={Math.floor(Math.random() * 80 + 20)} />
                         </div>
                       ))}
+                      <Button variant="outline" size="sm" className="w-full" asChild>
+                        <Link to="/dashboard?tab=courses" onClick={() => setActiveTab("courses")}>
+                          View All Courses
+                        </Link>
+                      </Button>
                     </div>
                   ) : (
                     <div className="text-center py-4 text-muted-foreground">
@@ -224,6 +235,11 @@ const Dashboard = () => {
                           </div>
                         </div>
                       ))}
+                      <Button variant="outline" size="sm" className="w-full" asChild>
+                        <Link to="/dashboard?tab=interviews" onClick={() => setActiveTab("interviews")}>
+                          View All Interviews
+                        </Link>
+                      </Button>
                     </div>
                   ) : (
                     <div className="text-center py-4 text-muted-foreground">

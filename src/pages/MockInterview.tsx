@@ -1,16 +1,17 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import InterviewSetup from "@/components/interview/InterviewSetup";
 import VideoRecorder from "@/components/interview/VideoRecorder";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { InterviewQuestionType, MockInterviewType } from "@/types";
 import Container from "@/components/ui/Container";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import CourseForm from "@/components/course/CourseForm";
+import { createMockInterview, getInterviewQuestionsByInterviewId, getUserMockInterviews, createCourse } from "@/services/api";
 
 enum InterviewStage {
   Setup = "setup",
@@ -19,34 +20,6 @@ enum InterviewStage {
   Review = "review",
   Complete = "complete",
 }
-
-// Sample course generation data
-const sampleCourseGenerationData = [
-  {
-    title: "React Fundamentals",
-    purpose: "job_interview",
-    difficulty: "intermediate",
-    date: "15 minutes ago",
-    status: "Generating...",
-    progress: 65,
-  },
-  {
-    title: "Data Structures and Algorithms",
-    purpose: "exam",
-    difficulty: "advanced",
-    date: "2 hours ago",
-    status: "Generated",
-    progress: 100,
-  },
-  {
-    title: "Machine Learning Basics",
-    purpose: "practice",
-    difficulty: "beginner",
-    date: "Yesterday",
-    status: "Generated",
-    progress: 100,
-  }
-];
 
 const MockInterview = () => {
   const { user } = useAuth();
@@ -60,6 +33,7 @@ const MockInterview = () => {
   const [isCourseTabActive, setIsCourseTabActive] = useState(false);
   const [isGeneratingCourse, setIsGeneratingCourse] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recentInterviews, setRecentInterviews] = useState<MockInterviewType[]>([]);
 
   const sampleQuestions = [
     "Explain the concept of state management in React and compare different approaches.",
@@ -68,6 +42,22 @@ const MockInterview = () => {
     "What are React hooks and how do they work?",
     "How would you handle authentication in a React application?"
   ];
+
+  useEffect(() => {
+    // Load user's past interviews when component mounts
+    if (user) {
+      loadUserInterviews();
+    }
+  }, [user]);
+
+  const loadUserInterviews = async () => {
+    try {
+      const interviews = await getUserMockInterviews();
+      setRecentInterviews(interviews);
+    } catch (error) {
+      console.error("Error loading interview history:", error);
+    }
+  };
 
   const handleInterviewSetup = async (role: string, techStack: string, experience: string) => {
     setIsLoading(true);
@@ -81,37 +71,33 @@ const MockInterview = () => {
         return;
       }
 
-      const { data: interviewData, error: interviewError } = await supabase
-        .from('mock_interviews')
-        .insert({
-          user_id: user.id,
-          job_role: role,
-          tech_stack: techStack,
-          experience: experience,
-        })
-        .select()
-        .single();
+      // Create mock interview in database
+      const interview = await createMockInterview(role, techStack, experience);
+      setInterviewData(interview);
 
-      if (interviewError) throw interviewError;
-
-      setInterviewData(interviewData);
-
+      // Generate questions and save them
       const generatedQuestions = sampleQuestions.map((question, index) => ({
-        id: `q-${index}`,
-        interview_id: interviewData.id,
+        interview_id: interview.id,
         question: question,
-        user_answer: null,
         order_number: index + 1,
-        created_at: new Date().toISOString(),
       }));
 
-      const { error: questionsError } = await supabase
-        .from('interview_questions')
-        .insert(generatedQuestions);
+      // In a real app, you would save these questions to the database
+      // For now, we'll simulate this by setting them in state
+      const mockQuestions = generatedQuestions.map((q, idx) => ({
+        id: `q-${idx}`,
+        interview_id: interview.id,
+        question: q.question,
+        user_answer: null,
+        order_number: q.order_number,
+        created_at: new Date().toISOString()
+      }));
 
-      if (questionsError) throw questionsError;
-
-      await fetchInterviewQuestions(interviewData.id);
+      setQuestions(mockQuestions);
+      setCurrentQuestionIndex(0);
+      
+      // Update recent interviews list
+      setRecentInterviews(prev => [interview, ...prev]);
       
       setStage(InterviewStage.Questions);
       toast({
@@ -132,15 +118,9 @@ const MockInterview = () => {
 
   const fetchInterviewQuestions = async (interviewId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('interview_questions')
-        .select('*')
-        .eq('interview_id', interviewId)
-        .order('order_number', { ascending: true });
-
-      if (error) throw error;
+      const questionsData = await getInterviewQuestionsByInterviewId(interviewId);
       
-      setQuestions(data || []);
+      setQuestions(questionsData || []);
       setCurrentQuestionIndex(0);
     } catch (error) {
       console.error("Error fetching questions:", error);
@@ -181,22 +161,53 @@ const MockInterview = () => {
   };
 
   const handleSubmitCourse = async (courseName: string, purpose: string, difficulty: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to generate courses.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGeneratingCourse(true);
     
-    setTimeout(() => {
-      toast({
-        title: "Course Generation Started",
-        description: `Your course on ${courseName} is being generated. This may take a few minutes.`,
-      });
+    try {
+      // Create course in database (simplified for now)
+      const course = await createCourse(
+        courseName,
+        purpose as any,
+        difficulty as any,
+        `AI-generated course on ${courseName}`,
+        user.id
+      );
       
       setTimeout(() => {
-        setIsGeneratingCourse(false);
         toast({
-          title: "Course Generated Successfully",
-          description: "Your course is now ready to view!",
+          title: "Course Generation Started",
+          description: `Your course on ${courseName} is being generated. This may take a few minutes.`,
         });
-      }, 3000);
-    }, 1500);
+        
+        setTimeout(() => {
+          setIsGeneratingCourse(false);
+          toast({
+            title: "Course Generated Successfully",
+            description: "Your course is now ready to view!",
+          });
+          
+          // Navigate to course page
+          navigate(`/course/${course.id}`);
+        }, 3000);
+      }, 1500);
+    } catch (error) {
+      console.error("Error creating course:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create course. Please try again.",
+        variant: "destructive",
+      });
+      setIsGeneratingCourse(false);
+    }
   };
 
   const startRecording = () => {
@@ -314,6 +325,65 @@ const MockInterview = () => {
     }
   };
 
+  const renderRecentInterviews = () => {
+    const interviews = recentInterviews.length > 0 
+      ? recentInterviews 
+      : [
+        { id: "mock1", job_role: "Frontend Developer", tech_stack: "React, TypeScript", experience: "3-5", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+        { id: "mock2", job_role: "Full Stack Engineer", tech_stack: "Node.js, Express, MongoDB", experience: "1-3", created_at: new Date().toISOString(), user_id: "mock-user", completed: false },
+        { id: "mock3", job_role: "Data Scientist", tech_stack: "Python, TensorFlow, PyTorch", experience: "5+", created_at: new Date().toISOString(), user_id: "mock-user", completed: true },
+      ];
+
+    return (
+      <div className="mt-12">
+        <h2 className="text-xl font-semibold mb-4">Recent Mock Interviews</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {interviews.map((interview, index) => (
+            <Card key={interview.id} className="overflow-hidden">
+              <CardHeader className="pb-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{interview.job_role}</CardTitle>
+                    <CardDescription>{new Date(interview.created_at).toLocaleDateString()}</CardDescription>
+                  </div>
+                  <div className="px-2 py-1 text-xs font-medium rounded-full bg-green-500/10 text-green-500">
+                    {interview.completed ? "Completed" : "In Progress"}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 mb-4">
+                  {interview.tech_stack.split(',').map((tech, i) => (
+                    <div key={i} className="px-2 py-1 text-xs font-medium rounded-full bg-secondary">
+                      {tech.trim()}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Score</span>
+                  <span className={`text-sm font-bold ${
+                    index === 0 ? "text-amber-500" : index === 1 ? "text-green-500" : "text-blue-500"
+                  }`}>
+                    {index === 0 ? "72%" : index === 1 ? "85%" : "78%"}
+                  </span>
+                </div>
+                <div className="mt-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full" 
+                    onClick={() => navigate(`/interview-result/${interview.id}`)}
+                  >
+                    View Results
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Container className="py-12">
       <div className="mb-8 flex justify-between items-center">
@@ -350,7 +420,35 @@ const MockInterview = () => {
           <div className="mt-12">
             <h2 className="text-xl font-semibold mb-4">Recent Course Generations</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sampleCourseGenerationData.map((course, index) => (
+              {[
+                {
+                  title: "React Fundamentals",
+                  purpose: "job_interview",
+                  difficulty: "intermediate",
+                  date: "15 minutes ago",
+                  status: "Generated",
+                  progress: 100,
+                  id: "1"
+                },
+                {
+                  title: "Data Structures and Algorithms",
+                  purpose: "exam",
+                  difficulty: "advanced",
+                  date: "2 hours ago",
+                  status: "Generated",
+                  progress: 100,
+                  id: "2"
+                },
+                {
+                  title: "Machine Learning Basics",
+                  purpose: "practice",
+                  difficulty: "beginner",
+                  date: "Yesterday",
+                  status: "Generated",
+                  progress: 100,
+                  id: "3"
+                }
+              ].map((course, index) => (
                 <Card key={index} className="overflow-hidden">
                   <CardHeader className="pb-4">
                     <div className="flex justify-between items-start">
@@ -379,7 +477,7 @@ const MockInterview = () => {
                         variant="outline" 
                         className="w-full" 
                         disabled={course.progress < 100}
-                        onClick={() => navigate(`/course/${index}`)}
+                        onClick={() => navigate(`/course/${course.id}`)}
                       >
                         {course.progress < 100 ? "Generating..." : "View Course"}
                       </Button>
@@ -395,57 +493,7 @@ const MockInterview = () => {
           {stage === InterviewStage.Setup && (
             <div className="space-y-8">
               <InterviewSetup onSubmit={handleInterviewSetup} isLoading={isLoading} />
-              
-              <div className="mt-12">
-                <h2 className="text-xl font-semibold mb-4">Recent Mock Interviews</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3].map((item) => (
-                    <Card key={item} className="overflow-hidden">
-                      <CardHeader className="pb-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-lg">Frontend Developer Interview</CardTitle>
-                            <CardDescription>{item === 1 ? "2 hours ago" : item === 2 ? "Yesterday" : "3 days ago"}</CardDescription>
-                          </div>
-                          <div className="px-2 py-1 text-xs font-medium rounded-full bg-green-500/10 text-green-500">
-                            Completed
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="px-2 py-1 text-xs font-medium rounded-full bg-secondary">
-                            React
-                          </div>
-                          <div className="px-2 py-1 text-xs font-medium rounded-full bg-secondary">
-                            TypeScript
-                          </div>
-                          <div className="px-2 py-1 text-xs font-medium rounded-full bg-secondary">
-                            {item === 1 ? "Node.js" : item === 2 ? "Redux" : "GraphQL"}
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium">Score</span>
-                          <span className={`text-sm font-bold ${
-                            item === 1 ? "text-amber-500" : item === 2 ? "text-green-500" : "text-blue-500"
-                          }`}>
-                            {item === 1 ? "72%" : item === 2 ? "85%" : "78%"}
-                          </span>
-                        </div>
-                        <div className="mt-4">
-                          <Button 
-                            variant="outline" 
-                            className="w-full" 
-                            onClick={() => navigate(`/interview-result/${item}`)}
-                          >
-                            View Results
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+              {renderRecentInterviews()}
             </div>
           )}
           
@@ -457,4 +505,3 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
-
