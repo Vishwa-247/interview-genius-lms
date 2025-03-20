@@ -2,8 +2,11 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
-// Use type assertions to work around type issues
-// This creates a safe wrapper around the Supabase client for our needs
+// Type assertion helper to work around typing issues
+const fromTable = <T>(tableName: string) => {
+  // @ts-ignore - We're using type assertion to overcome type limitations
+  return supabase.from(tableName);
+};
 
 // Course APIs
 export const createCourse = async (
@@ -13,8 +16,7 @@ export const createCourse = async (
   summary: string,
   userId: string
 ): Promise<CourseType> => {
-  const { data, error } = await supabase
-    .from('courses')
+  const { data, error } = await fromTable<CourseType>('courses')
     .insert({
       title,
       purpose,
@@ -30,8 +32,7 @@ export const createCourse = async (
 };
 
 export const getCourseById = async (courseId: string): Promise<CourseType> => {
-  const { data, error } = await supabase
-    .from('courses')
+  const { data, error } = await fromTable<CourseType>('courses')
     .select('*')
     .eq('id', courseId)
     .single();
@@ -41,14 +42,21 @@ export const getCourseById = async (courseId: string): Promise<CourseType> => {
 };
 
 export const getAllCourses = async (userId: string): Promise<CourseType[]> => {
-  const { data, error } = await supabase
-    .from('courses')
+  const { data, error } = await fromTable<CourseType>('courses')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
   return data as unknown as CourseType[];
+};
+
+// Added function for Dashboard.tsx
+export const getUserCourses = async (): Promise<CourseType[]> => {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+  
+  return getAllCourses(userData.user.id);
 };
 
 // Chapter APIs
@@ -61,8 +69,7 @@ export const createChapters = async (
     course_id: courseId
   }));
 
-  const { data, error } = await supabase
-    .from('chapters')
+  const { data, error } = await fromTable<ChapterType>('chapters')
     .insert(chaptersWithCourseId)
     .select();
 
@@ -71,8 +78,7 @@ export const createChapters = async (
 };
 
 export const getChaptersByCourseId = async (courseId: string): Promise<ChapterType[]> => {
-  const { data, error } = await supabase
-    .from('chapters')
+  const { data, error } = await fromTable<ChapterType>('chapters')
     .select('*')
     .eq('course_id', courseId)
     .order('order_number', { ascending: true });
@@ -91,8 +97,7 @@ export const createFlashcards = async (
     course_id: courseId
   }));
 
-  const { data, error } = await supabase
-    .from('flashcards')
+  const { data, error } = await fromTable<FlashcardType>('flashcards')
     .insert(flashcardsWithCourseId)
     .select();
 
@@ -101,8 +106,7 @@ export const createFlashcards = async (
 };
 
 export const getFlashcardsByCourseId = async (courseId: string): Promise<FlashcardType[]> => {
-  const { data, error } = await supabase
-    .from('flashcards')
+  const { data, error } = await fromTable<FlashcardType>('flashcards')
     .select('*')
     .eq('course_id', courseId);
 
@@ -115,17 +119,14 @@ export const createMcqs = async (
   courseId: string,
   mcqs: { question: string; options: string[]; correct_answer: string }[]
 ): Promise<McqType[]> => {
-  // Convert string[] options to a JSON-compatible format for database storage
   const mcqsWithCourseId = mcqs.map(mcq => ({
     course_id: courseId,
     question: mcq.question,
-    // Convert options array to JSON string for storage
     options: mcq.options,
     correct_answer: mcq.correct_answer
   }));
 
-  const { data, error } = await supabase
-    .from('mcqs')
+  const { data, error } = await fromTable<McqType>('mcqs')
     .insert(mcqsWithCourseId)
     .select();
 
@@ -134,8 +135,7 @@ export const createMcqs = async (
 };
 
 export const getMcqsByCourseId = async (courseId: string): Promise<McqType[]> => {
-  const { data, error } = await supabase
-    .from('mcqs')
+  const { data, error } = await fromTable<McqType>('mcqs')
     .select('*')
     .eq('course_id', courseId);
 
@@ -155,8 +155,7 @@ export const createQnas = async (
     course_id: courseId
   }));
 
-  const { data, error } = await supabase
-    .from('qna')
+  const { data, error } = await fromTable<QnaType>('qna')
     .insert(qnasWithCourseId)
     .select();
 
@@ -165,8 +164,7 @@ export const createQnas = async (
 };
 
 export const getQnasByCourseId = async (courseId: string): Promise<QnaType[]> => {
-  const { data, error } = await supabase
-    .from('qna')
+  const { data, error } = await fromTable<QnaType>('qna')
     .select('*')
     .eq('course_id', courseId);
 
@@ -183,8 +181,7 @@ export const createMockInterview = async (
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error("User not authenticated");
 
-  const { data, error } = await supabase
-    .from('mock_interviews')
+  const { data, error } = await fromTable<MockInterviewType>('mock_interviews')
     .insert({
       job_role: jobRole,
       tech_stack: techStack,
@@ -198,9 +195,22 @@ export const createMockInterview = async (
   return data as unknown as MockInterviewType;
 };
 
+// Added function for Dashboard.tsx
+export const getUserMockInterviews = async (): Promise<MockInterviewType[]> => {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+  
+  const { data, error } = await fromTable<MockInterviewType>('mock_interviews')
+    .select('*')
+    .eq('user_id', userData.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data as unknown as MockInterviewType[];
+};
+
 export const getMockInterviewById = async (interviewId: string): Promise<MockInterviewType> => {
-  const { data, error } = await supabase
-    .from('mock_interviews')
+  const { data, error } = await fromTable<MockInterviewType>('mock_interviews')
     .select('*')
     .eq('id', interviewId)
     .single();
@@ -210,8 +220,7 @@ export const getMockInterviewById = async (interviewId: string): Promise<MockInt
 };
 
 export const updateMockInterviewCompleted = async (interviewId: string): Promise<void> => {
-  const { error } = await supabase
-    .from('mock_interviews')
+  const { error } = await fromTable<MockInterviewType>('mock_interviews')
     .update({
       completed_at: new Date().toISOString()
     })
@@ -232,11 +241,10 @@ export const createInterviewQuestions = async (
     interview_id: interviewId,
     order_number: q.order_number,
     question: q.question,
-    user_answer: null as string | null // Make user_answer nullable to match our interface
+    user_answer: null // Make user_answer nullable to match interface
   }));
 
-  const { data, error } = await supabase
-    .from('interview_questions')
+  const { data, error } = await fromTable<InterviewQuestionType>('interview_questions')
     .insert(questionsWithInterviewId)
     .select();
 
@@ -245,8 +253,7 @@ export const createInterviewQuestions = async (
 };
 
 export const getInterviewQuestionsByInterviewId = async (interviewId: string): Promise<InterviewQuestionType[]> => {
-  const { data, error } = await supabase
-    .from('interview_questions')
+  const { data, error } = await fromTable<InterviewQuestionType>('interview_questions')
     .select('*')
     .eq('interview_id', interviewId)
     .order('order_number', { ascending: true });
@@ -256,8 +263,7 @@ export const getInterviewQuestionsByInterviewId = async (interviewId: string): P
 };
 
 export const updateInterviewQuestionAnswer = async (questionId: string, answer: string): Promise<void> => {
-  const { error } = await supabase
-    .from('interview_questions')
+  const { error } = await fromTable<InterviewQuestionType>('interview_questions')
     .update({
       user_answer: answer
     })
@@ -284,8 +290,7 @@ export const createInterviewAnalysis = async (
     link?: string;
   }[]
 ): Promise<InterviewAnalysisType> => {
-  const { data, error } = await supabase
-    .from('interview_analysis')
+  const { data, error } = await fromTable<InterviewAnalysisType>('interview_analysis')
     .insert({
       interview_id: interviewId,
       facial_expression_data: facialExpressionData,
@@ -302,8 +307,7 @@ export const createInterviewAnalysis = async (
 };
 
 export const getInterviewAnalysisByInterviewId = async (interviewId: string): Promise<InterviewAnalysisType> => {
-  const { data, error } = await supabase
-    .from('interview_analysis')
+  const { data, error } = await fromTable<InterviewAnalysisType>('interview_analysis')
     .select('*')
     .eq('interview_id', interviewId)
     .single();
@@ -331,6 +335,15 @@ export const generateCourseWithGemini = async (
 
   if (error) throw error;
   return data;
+};
+
+// Function for CourseGenerator.tsx to replace missing generateCourseContent
+export const generateCourseContent = async (
+  topic: string, 
+  purpose: CourseType['purpose'], 
+  difficulty: CourseType['difficulty']
+) => {
+  return generateCourseWithGemini(topic, purpose, difficulty);
 };
 
 export const generateInterviewQuestions = async (

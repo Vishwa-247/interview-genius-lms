@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { BookOpen, FileText, ListChecks, CreditCard, Loader2 } from "lucide-react";
+import { BookOpen, FileText, ListChecks, CreditCard } from "lucide-react";
 import Container from "@/components/ui/Container";
 import CourseForm from "@/components/course/CourseForm";
 import GlassMorphism from "@/components/ui/GlassMorphism";
@@ -9,7 +9,7 @@ import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { generateCourseContent, createCourse, createChapters, createFlashcards, createMCQs, createQnAs } from "@/services/api";
+import { generateCourseContent, createCourse, createChapters, createFlashcards, createMcqs, createQnas } from "@/services/api";
 import { CourseType } from "@/types";
 
 interface CourseContent {
@@ -132,12 +132,13 @@ const CourseGenerator = () => {
         ]
       };
       
-      // Save course to database
+      // Save course to database - now passing the user ID as the 5th argument
       const savedCourse = await createCourse(
         mockCourse.title,
         purpose,
         difficulty,
-        mockCourse.description
+        mockCourse.description,
+        user.id
       );
       
       // Save chapters
@@ -151,16 +152,16 @@ const CourseGenerator = () => {
       // Save flashcards
       await createFlashcards(savedCourse.id, mockCourse.flashcards);
       
-      // Save MCQs
+      // Save MCQs - updated to use createMcqs instead of createMCQs
       const mcqsToSave = mockCourse.quizzes.map(quiz => ({
         question: quiz.question,
         options: quiz.options,
         correct_answer: quiz.options[quiz.answer]
       }));
-      await createMCQs(savedCourse.id, mcqsToSave);
+      await createMcqs(savedCourse.id, mcqsToSave);
       
-      // Save Q&As
-      await createQnAs(savedCourse.id, mockCourse.qna);
+      // Save Q&As - updated to use createQnas instead of createQnAs
+      await createQnas(savedCourse.id, mockCourse.qna);
       
       setGeneratedCourse(mockCourse);
       
