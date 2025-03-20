@@ -1,25 +1,8 @@
 
 import { useState, useEffect, useRef } from 'react';
+import { analyzeFacialExpression } from '../services/api';
 
-// Mock facial expression analysis
-// In a real app, you would integrate an ML model for facial analysis
-const mockAnalyzeFacialExpression = (
-  videoElement: HTMLVideoElement | null
-): { confident: number; stressed: number; hesitant: number; nervous: number } => {
-  // In a real implementation, you would:
-  // 1. Capture a frame from the video
-  // 2. Send it to an ML model API
-  // 3. Get back facial expression probabilities
-  
-  // For demo purposes, we'll generate random values
-  return {
-    confident: Math.random() * 0.7 + 0.3, // Between 0.3 and 1.0
-    stressed: Math.random() * 0.5,        // Between 0 and 0.5
-    hesitant: Math.random() * 0.6,        // Between 0 and 0.6
-    nervous: Math.random() * 0.4,         // Between 0 and 0.4
-  };
-};
-
+// Enhanced facial expression analysis that will connect to Flask API in the future
 const useFacialAnalysis = (
   isActive: boolean = false,
   interval: number = 3000
@@ -29,17 +12,56 @@ const useFacialAnalysis = (
     stressed: number;
     hesitant: number;
     nervous: number;
+    excited: number;
   }>({
     confident: 0,
     stressed: 0,
     hesitant: 0,
     nervous: 0,
+    excited: 0
   });
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const analysisTimerRef = useRef<number | null>(null);
   const allAnalysisData = useRef<typeof facialData[]>([]);
+
+  const captureImage = async (): Promise<Blob | null> => {
+    if (!videoRef.current) return null;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    
+    return new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.95);
+    });
+  };
+
+  const analyzeFrame = async () => {
+    try {
+      const imageBlob = await captureImage();
+      
+      if (!imageBlob) {
+        console.error('Failed to capture image from video');
+        return;
+      }
+      
+      // In the future, this will send the image to the Flask API
+      // For now, use the mock function from api.ts
+      const analysis = await analyzeFacialExpression(imageBlob);
+      
+      setFacialData(analysis);
+      allAnalysisData.current.push(analysis);
+    } catch (error) {
+      console.error('Error analyzing facial expression:', error);
+    }
+  };
 
   const startAnalysis = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -56,11 +78,7 @@ const useFacialAnalysis = (
         setIsAnalyzing(true);
         
         // Start analyzing at intervals
-        analysisTimerRef.current = window.setInterval(() => {
-          const analysis = mockAnalyzeFacialExpression(videoRef.current);
-          setFacialData(analysis);
-          allAnalysisData.current.push(analysis);
-        }, interval);
+        analysisTimerRef.current = window.setInterval(analyzeFrame, interval);
       }
     } catch (error) {
       console.error('Error accessing webcam:', error);
@@ -94,8 +112,9 @@ const useFacialAnalysis = (
         stressed: acc.stressed + data.stressed,
         hesitant: acc.hesitant + data.hesitant,
         nervous: acc.nervous + data.nervous,
+        excited: acc.excited + data.excited
       }),
-      { confident: 0, stressed: 0, hesitant: 0, nervous: 0 }
+      { confident: 0, stressed: 0, hesitant: 0, nervous: 0, excited: 0 }
     );
     
     const count = allAnalysisData.current.length;
@@ -105,6 +124,7 @@ const useFacialAnalysis = (
       stressed: sum.stressed / count,
       hesitant: sum.hesitant / count,
       nervous: sum.nervous / count,
+      excited: sum.excited / count
     };
   };
 

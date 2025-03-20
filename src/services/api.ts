@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
@@ -280,6 +279,7 @@ export const createInterviewAnalysis = async (
     stressed: number;
     hesitant: number;
     nervous: number;
+    excited: number;
   },
   pronunciationFeedback: string,
   technicalFeedback: string,
@@ -314,6 +314,51 @@ export const getInterviewAnalysisByInterviewId = async (interviewId: string): Pr
 
   if (error) throw error;
   return data as InterviewAnalysisType;
+};
+
+// Speech Analysis API - Added for communication skills analysis
+export const analyzeSpeech = async (
+  audioBlob: Blob,
+  jobRole: string
+): Promise<{
+  clarity: number;
+  confidence: number;
+  fluency: number;
+  accent: number;
+  grammar: number;
+  feedback: string;
+}> => {
+  // This will later integrate with the Flask API
+  // For now, return mock data
+  return {
+    clarity: Math.random() * 60 + 40, // 40-100
+    confidence: Math.random() * 60 + 40,
+    fluency: Math.random() * 60 + 40,
+    accent: Math.random() * 60 + 40,
+    grammar: Math.random() * 60 + 40,
+    feedback: "Your speech was clear, but try to slow down for technical explanations. Work on eliminating filler words like 'um' and 'ah'."
+  };
+};
+
+// Future API endpoint for facial expression analysis that will connect to Flask
+export const analyzeFacialExpression = async (
+  imageBlob: Blob
+): Promise<{
+  confident: number;
+  stressed: number;
+  hesitant: number;
+  nervous: number;
+  excited: number;
+}> => {
+  // This will later integrate with the Flask API
+  // For now, return mock data
+  return {
+    confident: Math.random() * 0.7 + 0.3, // Between 0.3 and 1.0
+    stressed: Math.random() * 0.5,        // Between 0 and 0.5
+    hesitant: Math.random() * 0.6,        // Between 0 and 0.6
+    nervous: Math.random() * 0.4,         // Between 0 and 0.4
+    excited: Math.random() * 0.5 + 0.2    // Between 0.2 and 0.7
+  };
 };
 
 // Gemini API integration

@@ -15,7 +15,14 @@ import InterviewResult from "./pages/InterviewResult";
 import Auth from "./pages/Auth";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -56,6 +63,8 @@ const App = () => (
                 </Layout>
               } 
             />
+            {/* API proxy route for future Flask integration */}
+            <Route path="/api/*" element={<div>API Proxy</div>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

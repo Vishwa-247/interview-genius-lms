@@ -1,5 +1,4 @@
-
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Mic, MessageSquare, Video, ChevronRight } from "lucide-react";
 import Container from "@/components/ui/Container";
 import GlassMorphism from "@/components/ui/GlassMorphism";
@@ -18,7 +17,8 @@ import {
   updateInterviewQuestionAnswer,
   updateMockInterviewCompleted,
   analyzeInterviewResponse,
-  createInterviewAnalysis
+  createInterviewAnalysis,
+  analyzeSpeech
 } from "@/services/api";
 import { Progress } from "@/components/ui/progress";
 
@@ -44,6 +44,8 @@ const MockInterview = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [speechAnalysis, setSpeechAnalysis] = useState<any | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -56,6 +58,46 @@ const MockInterview = () => {
     stopAnalysis,
     getAggregatedAnalysis
   } = useFacialAnalysis(step === "interview");
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(audioBlob);
+        audioChunksRef.current = [];
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting audio recording:', error);
+    }
+  };
+  
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+      
+      setIsRecording(false);
+    }
+  };
   
   const handleProfileSubmit = async (role: string, techStack: string, experience: string) => {
     if (!user) {
@@ -71,44 +113,53 @@ const MockInterview = () => {
     setIsLoading(true);
     
     try {
-      // 1. Create a new interview in the database
       const interview = await createMockInterview(role, techStack, experience);
       setInterviewId(interview.id);
       
-      // 2. Generate questions using Gemini API
-      // For demo purposes, we'll use mock questions
-      const mockQuestions: InterviewQuestion[] = [
-        {
-          question: `As a ${role} with experience in ${techStack}, how would you approach scaling a system that needs to handle a 10x increase in traffic?`,
-          order_number: 1
-        },
-        {
-          question: `What are the most challenging problems you've solved using ${techStack} in your ${experience} years of experience?`,
-          order_number: 2
-        },
-        {
-          question: "Describe a time when you had to learn a new technology quickly to meet a project deadline.",
-          order_number: 3
-        },
-        {
-          question: "How do you stay updated with the latest trends and advancements in your field?",
-          order_number: 4
-        },
-        {
-          question: "What's your approach to debugging complex issues in production environments?",
-          order_number: 5
-        }
-      ];
+      let interviewQuestions: InterviewQuestion[];
       
-      // 3. Save questions to the database
-      const savedQuestions = await createInterviewQuestions(interview.id, mockQuestions);
+      try {
+        const generatedData = await generateInterviewQuestions(role, techStack, experience, 5);
+        
+        const extractedQuestions = extractQuestionsFromGeminiResponse(generatedData);
+        
+        interviewQuestions = extractedQuestions.map((q, index) => ({
+          question: q,
+          order_number: index + 1
+        }));
+      } catch (error) {
+        console.error("Error generating questions with Gemini:", error);
+        
+        interviewQuestions = [
+          {
+            question: `As a ${role} with experience in ${techStack}, how would you approach scaling a system that needs to handle a 10x increase in traffic?`,
+            order_number: 1
+          },
+          {
+            question: `What are the most challenging problems you've solved using ${techStack} in your ${experience} years of experience?`,
+            order_number: 2
+          },
+          {
+            question: "Describe a time when you had to learn a new technology quickly to meet a project deadline.",
+            order_number: 3
+          },
+          {
+            question: "How do you stay updated with the latest trends and advancements in your field?",
+            order_number: 4
+          },
+          {
+            question: "What's your approach to debugging complex issues in production environments?",
+            order_number: 5
+          }
+        ];
+      }
+      
+      const savedQuestions = await createInterviewQuestions(interview.id, interviewQuestions);
       setQuestions(savedQuestions);
       
-      // 4. Set up the interview
       setProfile({ role, techStack, experience });
       setStep("interview");
       
-      // 5. Start facial analysis
       startAnalysis();
       
     } catch (error) {
@@ -123,29 +174,79 @@ const MockInterview = () => {
     }
   };
   
+  const extractQuestionsFromGeminiResponse = (response: any): string[] => {
+    try {
+      if (response?.text) {
+        const text = response.text;
+        
+        const questionRegex = /\d+\.\s+(.+?)(?=\d+\.|$)/gs;
+        const matches = [...text.matchAll(questionRegex)];
+        
+        if (matches.length > 0) {
+          return matches.map(match => match[1].trim());
+        }
+        
+        const lines = text.split('\n');
+        const questions = lines.filter(line => line.trim().endsWith('?'));
+        
+        if (questions.length > 0) {
+          return questions.map(q => q.trim());
+        }
+      }
+      
+      if (response?.candidates && response.candidates.length > 0) {
+        const content = response.candidates[0].content;
+        if (content && Array.isArray(content.parts)) {
+          const text = content.parts.map(part => part.text || '').join(' ');
+          
+          const lines = text.split('\n');
+          return lines
+            .filter(line => line.includes('?'))
+            .map(line => line.trim())
+            .slice(0, 5);
+        }
+      }
+      
+      throw new Error("Could not extract questions from response");
+    } catch (error) {
+      console.error("Error extracting questions from Gemini response:", error);
+      throw error;
+    }
+  };
+  
   const handleNextQuestion = async () => {
     if (!interviewId || !questions[currentQuestionIndex]?.id) return;
     
     try {
-      // Save current response
       if (currentAnswer.trim()) {
         await updateInterviewQuestionAnswer(
           questions[currentQuestionIndex].id as string,
           currentAnswer
         );
         
-        // Update local state
         const updatedQuestions = [...questions];
         updatedQuestions[currentQuestionIndex].user_answer = currentAnswer;
         setQuestions(updatedQuestions);
       }
       
+      if (audioBlob && profile) {
+        try {
+          const analysis = await analyzeSpeech(audioBlob, profile.role);
+          setSpeechAnalysis(prev => ({
+            ...prev,
+            [currentQuestionIndex]: analysis
+          }));
+        } catch (error) {
+          console.error("Error analyzing speech:", error);
+        }
+      }
+      
+      setAudioBlob(null);
+      
       if (currentQuestionIndex < questions.length - 1) {
-        // Move to next question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setCurrentAnswer("");
       } else {
-        // End of interview
         await finishInterview();
       }
     } catch (error) {
@@ -164,25 +265,72 @@ const MockInterview = () => {
     setIsLoading(true);
     
     try {
-      // 1. Stop facial analysis
       stopAnalysis();
       
-      // 2. Mark interview as completed
       await updateMockInterviewCompleted(interviewId);
       
-      // 3. Analyze responses and generate feedback
-      // In a real app, you'd use the Gemini API here
-      
-      // Get aggregated facial expression data
       const facialExpressionData = getAggregatedAnalysis();
       
-      // Mock feedback
-      const mockFeedback = {
+      let technicalFeedback = "";
+      let languageFeedback = "";
+      
+      try {
+        const lastQuestion = questions[questions.length - 1];
+        if (lastQuestion && lastQuestion.user_answer) {
+          const analysis = await analyzeInterviewResponse(
+            profile.role,
+            lastQuestion.question,
+            lastQuestion.user_answer
+          );
+          
+          if (analysis && analysis.text) {
+            const text = analysis.text;
+            technicalFeedback = extractTechnicalFeedback(text);
+            languageFeedback = extractLanguageFeedback(text);
+          }
+        }
+      } catch (error) {
+        console.error("Error analyzing responses with Gemini:", error);
+        technicalFeedback = "You demonstrated good understanding of technical concepts. Try to provide more specific examples in your answers.";
+        languageFeedback = "Your language skills are good. Work on reducing filler words and speaking more concisely.";
+      }
+      
+      let pronunciationFeedback = "Your pronunciation is clear. Continue practicing technical terminology to improve fluency.";
+      
+      if (speechAnalysis) {
+        const allFeedback = Object.values(speechAnalysis).map((analysis: any) => analysis.feedback);
+        pronunciationFeedback = allFeedback[0] || pronunciationFeedback;
+      }
+      
+      const courseRecommendations = [
+        {
+          title: `Advanced ${profile.techStack.split(',')[0]} Techniques`,
+          description: "Master advanced concepts and patterns"
+        },
+        {
+          title: "Technical Communication Skills",
+          description: "Improve how you communicate complex technical ideas"
+        },
+        {
+          title: "System Design Fundamentals",
+          description: "Learn how to design scalable systems"
+        }
+      ];
+      
+      await createInterviewAnalysis(
+        interviewId,
+        facialExpressionData,
+        pronunciationFeedback,
+        technicalFeedback,
+        languageFeedback,
+        courseRecommendations
+      );
+      
+      setFeedback({
         accuracy: Math.floor(Math.random() * 30 + 70),
         communication: Math.floor(Math.random() * 30 + 70),
         structure: Math.floor(Math.random() * 20 + 80),
-        feedback:
-          `Overall, you demonstrated good technical knowledge and communication skills in this ${profile.role} interview. Your answers were structured and provided relevant examples.`,
+        feedback: technicalFeedback,
         strengthPoints: [
           "Clear articulation of complex technical concepts",
           `Good knowledge of ${profile.techStack}`,
@@ -193,34 +341,9 @@ const MockInterview = () => {
           "Consider speaking at a slightly slower pace during technical explanations",
           "Expand on how you've handled challenges or conflicts",
         ],
-        courseRecommendations: [
-          {
-            title: `Advanced ${profile.techStack.split(',')[0]} Techniques`,
-            description: "Master advanced concepts and patterns"
-          },
-          {
-            title: "Technical Communication Skills",
-            description: "Improve how you communicate complex technical ideas"
-          },
-          {
-            title: "System Design Fundamentals",
-            description: "Learn how to design scalable systems"
-          }
-        ]
-      };
+        courseRecommendations
+      });
       
-      // 4. Save analysis to database
-      await createInterviewAnalysis(
-        interviewId,
-        facialExpressionData,
-        "Good pronunciation with occasional technical terms that could be clearer",
-        mockFeedback.feedback,
-        "Minor grammatical issues but overall clear communication",
-        mockFeedback.courseRecommendations
-      );
-      
-      // 5. Set feedback and move to feedback step
-      setFeedback(mockFeedback);
       setStep("feedback");
       
     } catch (error) {
@@ -233,6 +356,36 @@ const MockInterview = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const extractTechnicalFeedback = (text: string): string => {
+    const technicalKeywords = ['technical', 'concept', 'understanding', 'knowledge'];
+    
+    const sentences = text.split(/[.!?]+/);
+    const technicalSentences = sentences.filter(sentence => 
+      technicalKeywords.some(keyword => sentence.toLowerCase().includes(keyword))
+    );
+    
+    if (technicalSentences.length > 0) {
+      return technicalSentences.join('. ') + '.';
+    }
+    
+    return "You demonstrated good technical knowledge. Consider providing more specific examples in your future responses.";
+  };
+  
+  const extractLanguageFeedback = (text: string): string => {
+    const languageKeywords = ['language', 'grammar', 'vocabulary', 'articulate', 'communication'];
+    
+    const sentences = text.split(/[.!?]+/);
+    const languageSentences = sentences.filter(sentence => 
+      languageKeywords.some(keyword => sentence.toLowerCase().includes(keyword))
+    );
+    
+    if (languageSentences.length > 0) {
+      return languageSentences.join('. ') + '.';
+    }
+    
+    return "Your communication skills are good. Try to use more varied vocabulary and clearer explanations of technical concepts.";
   };
   
   const renderProgressBar = () => {
@@ -273,15 +426,37 @@ const MockInterview = () => {
           </div>
           <Progress value={facialData.hesitant * 100} className="h-1" />
         </div>
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span>Nervousness</span>
+            <span>{Math.round(facialData.nervous * 100)}%</span>
+          </div>
+          <Progress value={facialData.nervous * 100} className="h-1" />
+        </div>
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span>Excitement</span>
+            <span>{Math.round(facialData.excited * 100)}%</span>
+          </div>
+          <Progress value={facialData.excited * 100} className="h-1" />
+        </div>
       </div>
     );
   };
+  
+  useEffect(() => {
+    if (isRecording) {
+      startRecording();
+    } else {
+      stopRecording();
+    }
+  }, [isRecording]);
   
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
-      <main className="flex-grow pt-32">
+      <main className="flex-grow pt-28">
         <Container>
           {step === "setup" && (
             <>
@@ -328,8 +503,13 @@ const MockInterview = () => {
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium">Your Response</h3>
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                          <Mic size={16} />
-                          <span>Voice or text</span>
+                          <button 
+                            onClick={() => setIsRecording(!isRecording)}
+                            className={`p-1 rounded-full ${isRecording ? 'bg-red-500 text-white' : 'bg-secondary'}`}
+                          >
+                            <Mic size={16} />
+                          </button>
+                          <span>{isRecording ? 'Recording...' : 'Voice or text'}</span>
                         </div>
                       </div>
                       

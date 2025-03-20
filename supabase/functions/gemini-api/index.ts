@@ -26,7 +26,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'generate_course':
-        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         requestBody = {
           contents: [{
             parts: [{
@@ -44,12 +44,13 @@ serve(async (req) => {
         break;
 
       case 'generate_interview_questions':
-        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         requestBody = {
           contents: [{
             parts: [{
               text: `Generate ${data.questionCount || 5} interview questions for a ${data.experience} years experienced ${data.jobRole} 
-                     with expertise in ${data.techStack}. The questions should be challenging and relevant to the role.`
+                     with expertise in ${data.techStack}. The questions should be challenging and relevant to the role.
+                     Format the response as a numbered list with just the questions.`
             }]
           }],
           generationConfig: {
@@ -60,7 +61,7 @@ serve(async (req) => {
         break;
 
       case 'analyze_interview':
-        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         requestBody = {
           contents: [{
             parts: [{
@@ -68,7 +69,39 @@ serve(async (req) => {
                      Question: ${data.question}
                      Answer: ${data.answer}
                      
-                     Provide technical feedback, language corrections, and suggestions for improvement.`
+                     Provide detailed analysis in the following format:
+                     
+                     Technical Feedback: (Analyze understanding of technical concepts and accuracy)
+                     Communication Feedback: (Analyze clarity, structure, and language used)
+                     Strengths: (List 3 specific strengths in the response)
+                     Areas to Improve: (List 3 specific areas that could be improved)
+                     Overall Rating: (Give a rating between 0-100)`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+          }
+        };
+        break;
+
+      case 'analyze_speech':
+        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        requestBody = {
+          contents: [{
+            parts: [{
+              text: `Analyze this speech transcript for a ${data.jobRole} interview:
+                    
+                     "${data.transcript}"
+                     
+                     Evaluate the speaking skills in terms of:
+                     1. Clarity (how clear and understandable the speech is)
+                     2. Confidence (how confident the speaker sounds)
+                     3. Fluency (how smoothly the speech flows)
+                     4. Grammar and vocabulary (correctness and richness of language)
+                     5. Technical accuracy (correct use of technical terms)
+                     
+                     Provide a rating for each category (0-100) and specific feedback on how to improve.`
             }]
           }],
           generationConfig: {

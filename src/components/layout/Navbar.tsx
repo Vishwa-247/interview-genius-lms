@@ -64,105 +64,96 @@ const Navbar = () => {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? "py-3" : "py-5"
-      }`}
+        isScrolled ? "py-2" : "py-3"
+      } bg-white/90 dark:bg-background/90 backdrop-blur-sm border-b border-border/40 shadow-sm`}
     >
-      <GlassMorphism
-        className={`w-full transition-all duration-300 ${
-          isScrolled ? "bg-white/70 dark:bg-black/70" : "bg-white/30 dark:bg-black/30"
-        }`}
-      >
-        <Container>
-          <div className="flex items-center justify-between h-16">
-            <Link
-              to="/"
-              className="flex items-center space-x-2 text-xl font-bold transition-opacity hover:opacity-80"
-            >
-              <span className="text-gradient">InterviewGenius</span>
-            </Link>
+      <Container>
+        <div className="flex items-center justify-between h-16">
+          <Link
+            to="/"
+            className="flex items-center space-x-2 text-xl font-bold transition-opacity hover:opacity-80"
+          >
+            <span className="text-gradient">StudyMate</span>
+          </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
-              {navLinks.map((link) => (
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-8">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                to={link.href}
+                className={`text-sm font-medium transition-all duration-200 hover:text-primary ${
+                  location.pathname === link.href
+                    ? "text-primary"
+                    : "text-foreground/80"
+                }`}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Auth Buttons - Desktop */}
+          <div className="hidden md:flex items-center space-x-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.user_metadata?.avatar_url || ""} alt={user.user_metadata?.full_name || "User"} />
+                      <AvatarFallback>{getInitials(user.user_metadata?.full_name || "")}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || user.email}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard" className="cursor-pointer w-full">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>My Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-4">
                 <Link
-                  key={link.name}
-                  to={link.href}
-                  className={`text-sm font-medium transition-all duration-200 hover:text-primary ${
-                    location.pathname === link.href
-                      ? "text-primary"
-                      : "text-foreground/80"
-                  }`}
+                  to="/auth"
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-full transition-colors"
                 >
-                  {link.name}
+                  Sign In
                 </Link>
-              ))}
-            </nav>
-
-            {/* Auth Buttons - Desktop */}
-            <div className="hidden md:flex items-center space-x-4">
-              {user ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.user_metadata?.avatar_url || ""} alt={user.user_metadata?.full_name || "User"} />
-                        <AvatarFallback>{getInitials(user.user_metadata?.full_name || "")}</AvatarFallback>
-                      </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || user.email}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to="/dashboard" className="cursor-pointer w-full">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>My Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <div className="flex items-center space-x-4">
-                  <Link
-                    to="/auth"
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-full transition-colors"
-                  >
-                    Sign In
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              className="md:hidden text-foreground"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
+              </div>
+            )}
           </div>
-        </Container>
-      </GlassMorphism>
+
+          {/* Mobile Menu Toggle */}
+          <button
+            className="md:hidden text-foreground"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      </Container>
 
       {/* Mobile Navigation */}
       {isMenuOpen && (
-        <GlassMorphism 
-          className="md:hidden fixed inset-x-0 top-[5.5rem] h-screen z-50 p-6 flex flex-col space-y-8"
-          intensity="heavy"
-        >
+        <div className="md:hidden fixed inset-x-0 top-[5.5rem] bg-background/95 backdrop-blur-sm h-screen z-50 p-6 flex flex-col space-y-8 border-t border-border/40">
           <nav className="flex flex-col space-y-6">
             {navLinks.map((link) => (
               <Link
@@ -215,7 +206,7 @@ const Navbar = () => {
               </Link>
             )}
           </div>
-        </GlassMorphism>
+        </div>
       )}
     </header>
   );
