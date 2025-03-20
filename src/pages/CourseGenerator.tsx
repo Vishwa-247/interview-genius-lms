@@ -4,8 +4,6 @@ import { BookOpen, FileText, ListChecks, CreditCard } from "lucide-react";
 import Container from "@/components/ui/Container";
 import CourseForm from "@/components/course/CourseForm";
 import GlassMorphism from "@/components/ui/GlassMorphism";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +19,34 @@ interface CourseContent {
   quizzes: Array<{ question: string; options: string[]; answer: number }>;
   qna: Array<{ question: string; answer: string }>;
 }
+
+// Sample course topics for quick generation
+const sampleCourseTopics = [
+  {
+    title: "JavaScript Fundamentals",
+    description: "Master the core concepts of JavaScript programming language",
+    difficulty: "beginner" as const,
+    purpose: "coding_preparation" as const
+  },
+  {
+    title: "React.js Advanced Patterns",
+    description: "Learn advanced patterns and techniques for React applications",
+    difficulty: "advanced" as const,
+    purpose: "job_interview" as const
+  },
+  {
+    title: "Data Structures & Algorithms",
+    description: "Comprehensive guide to essential data structures and algorithms",
+    difficulty: "intermediate" as const,
+    purpose: "coding_preparation" as const
+  },
+  {
+    title: "System Design Principles",
+    description: "Learn how to design scalable and reliable software systems",
+    difficulty: "expert" as const,
+    purpose: "job_interview" as const
+  }
+];
 
 const CourseGenerator = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -181,6 +207,11 @@ const CourseGenerator = () => {
     }
   };
 
+  const handleQuickGenerate = async (topicIndex: number) => {
+    const topic = sampleCourseTopics[topicIndex];
+    await handleGenerateCourse(topic.title, topic.purpose, topic.difficulty);
+  };
+
   const renderTabContent = () => {
     if (!generatedCourse) return null;
 
@@ -276,100 +307,120 @@ const CourseGenerator = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      
-      <main className="flex-grow pt-32">
-        <Container>
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">
-              Generate Your <span className="text-gradient">Personalized</span> Course
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Enter a topic and difficulty level, and our AI will create a
-              comprehensive learning experience tailored to your needs.
-            </p>
-          </div>
+    <Container>
+      <div className="py-6">
+        <div className="max-w-3xl mx-auto text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">
+            Generate Your <span className="text-gradient">Personalized</span> Course
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Enter a topic and difficulty level, and our AI will create a
+            comprehensive learning experience tailored to your needs.
+          </p>
+        </div>
 
-          {!generatedCourse ? (
+        {!generatedCourse ? (
+          <>
             <CourseForm onSubmit={handleGenerateCourse} isLoading={isLoading} />
-          ) : (
-            <div className="space-y-8">
-              <GlassMorphism className="p-8" intensity="medium">
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-bold">{generatedCourse.title}</h2>
-                  <p className="text-muted-foreground">
-                    {generatedCourse.description}
-                  </p>
-                </div>
-              </GlassMorphism>
-
-              <div className="flex overflow-x-auto space-x-2 pb-2">
-                <button
-                  onClick={() => setActiveTab("notes")}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
-                    activeTab === "notes"
-                      ? "bg-primary text-white"
-                      : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
-                  }`}
-                >
-                  <FileText size={16} />
-                  <span>Notes</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("chapters")}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
-                    activeTab === "chapters"
-                      ? "bg-primary text-white"
-                      : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
-                  }`}
-                >
-                  <BookOpen size={16} />
-                  <span>Chapters</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("flashcards")}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
-                    activeTab === "flashcards"
-                      ? "bg-primary text-white"
-                      : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
-                  }`}
-                >
-                  <CreditCard size={16} />
-                  <span>Flashcards</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("quizzes")}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
-                    activeTab === "quizzes"
-                      ? "bg-primary text-white"
-                      : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
-                  }`}
-                >
-                  <ListChecks size={16} />
-                  <span>Quizzes</span>
-                </button>
-              </div>
-
-              <GlassMorphism className="p-8" intensity="medium">
-                {renderTabContent()}
-              </GlassMorphism>
-
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setGeneratedCourse(null)}
-                  className="px-6 py-3 bg-secondary text-foreground font-medium rounded-lg hover:bg-secondary/80 transition-colors"
-                >
-                  Generate Another Course
-                </button>
+            
+            <div className="mt-10">
+              <h2 className="text-xl font-semibold mb-4 text-center">Or try one of our ready-made courses</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {sampleCourseTopics.map((topic, index) => (
+                  <div 
+                    key={index}
+                    className="bg-secondary/50 hover:bg-secondary cursor-pointer rounded-lg p-4 transition-all"
+                    onClick={() => handleQuickGenerate(index)}
+                  >
+                    <h3 className="font-semibold text-lg">{topic.title}</h3>
+                    <p className="text-sm text-muted-foreground">{topic.description}</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                        {topic.difficulty}
+                      </span>
+                      <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full">
+                        {topic.purpose.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-        </Container>
-      </main>
-      
-      <Footer />
-    </div>
+          </>
+        ) : (
+          <div className="space-y-8">
+            <GlassMorphism className="p-8" intensity="medium">
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">{generatedCourse.title}</h2>
+                <p className="text-muted-foreground">
+                  {generatedCourse.description}
+                </p>
+              </div>
+            </GlassMorphism>
+
+            <div className="flex overflow-x-auto space-x-2 pb-2">
+              <button
+                onClick={() => setActiveTab("notes")}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
+                  activeTab === "notes"
+                    ? "bg-primary text-white"
+                    : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
+                }`}
+              >
+                <FileText size={16} />
+                <span>Notes</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("chapters")}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
+                  activeTab === "chapters"
+                    ? "bg-primary text-white"
+                    : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
+                }`}
+              >
+                <BookOpen size={16} />
+                <span>Chapters</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("flashcards")}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
+                  activeTab === "flashcards"
+                    ? "bg-primary text-white"
+                    : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
+                }`}
+              >
+                <CreditCard size={16} />
+                <span>Flashcards</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("quizzes")}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap transition-colors ${
+                  activeTab === "quizzes"
+                    ? "bg-primary text-white"
+                    : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20"
+                }`}
+              >
+                <ListChecks size={16} />
+                <span>Quizzes</span>
+              </button>
+            </div>
+
+            <GlassMorphism className="p-8" intensity="medium">
+              {renderTabContent()}
+            </GlassMorphism>
+
+            <div className="flex justify-center">
+              <button
+                onClick={() => setGeneratedCourse(null)}
+                className="px-6 py-3 bg-secondary text-foreground font-medium rounded-lg hover:bg-secondary/80 transition-colors"
+              >
+                Generate Another Course
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Container>
   );
 };
 

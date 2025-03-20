@@ -64,11 +64,11 @@ const Navbar = () => {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? "py-2" : "py-3"
+        isScrolled ? "py-3" : "py-4"
       } bg-white/90 dark:bg-background/90 backdrop-blur-sm border-b border-border/40 shadow-sm`}
     >
       <Container>
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-18">
           <Link
             to="/"
             className="flex items-center space-x-2 text-xl font-bold transition-opacity hover:opacity-80"
@@ -153,7 +153,7 @@ const Navbar = () => {
 
       {/* Mobile Navigation */}
       {isMenuOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[5.5rem] bg-background/95 backdrop-blur-sm h-screen z-50 p-6 flex flex-col space-y-8 border-t border-border/40">
+        <div className="md:hidden fixed inset-x-0 top-[6rem] bg-background/95 backdrop-blur-sm h-screen z-50 p-6 flex flex-col space-y-8 border-t border-border/40">
           <nav className="flex flex-col space-y-6">
             {navLinks.map((link) => (
               <Link

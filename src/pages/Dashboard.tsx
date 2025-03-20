@@ -73,7 +73,7 @@ const Dashboard = () => {
 
   return (
     <Container>
-      <div className="py-12">
+      <div className="py-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">StudyMate Dashboard</h1>
