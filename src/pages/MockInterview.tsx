@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -243,12 +242,13 @@ const MockInterview = () => {
       setStage(InterviewStage.Complete);
       
       if (interviewData) {
-        // Fix the Promise chain by adding a proper then/catch
-        supabase
-          .from('mock_interviews')
-          .update({ completed: true })
-          .eq('id', interviewData.id)
-          .then(() => {
+        (async () => {
+          try {
+            await supabase
+              .from('mock_interviews')
+              .update({ completed: true })
+              .eq('id', interviewData.id);
+              
             toast({
               title: "Interview Completed",
               description: "Your interview has been completed. Preparing your results...",
@@ -257,15 +257,15 @@ const MockInterview = () => {
             setTimeout(() => {
               navigate(`/interview-result/${interviewData.id}`);
             }, 2000);
-          })
-          .catch(error => {
+          } catch (error) {
             console.error("Error updating interview status:", error);
             toast({
               title: "Error",
               description: "Failed to update interview status.",
               variant: "destructive",
             });
-          });
+          }
+        })();
       }
     }
   };
@@ -329,7 +329,6 @@ const MockInterview = () => {
       
       if (courseError) throw courseError;
       
-      // Update recent courses with type assertion
       setRecentCourses(prev => [course as CourseType, ...prev]);
       
       toast({
@@ -733,3 +732,4 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
+
