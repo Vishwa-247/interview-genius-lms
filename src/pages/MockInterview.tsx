@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -5,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import InterviewSetup from "@/components/interview/InterviewSetup";
 import VideoRecorder from "@/components/interview/VideoRecorder";
 import { useAuth } from "@/context/AuthContext";
-import { InterviewQuestionType, MockInterviewType } from "@/types";
+import { InterviewQuestionType, MockInterviewType, CourseType } from "@/types";
 import Container from "@/components/ui/Container";
 import { ChevronLeft, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,10 +34,12 @@ const MockInterview = () => {
   const [isGeneratingCourse, setIsGeneratingCourse] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recentInterviews, setRecentInterviews] = useState<MockInterviewType[]>([]);
+  const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
 
   useEffect(() => {
     if (user) {
       loadUserInterviews();
+      loadUserCourses();
     }
   }, [user]);
 
@@ -54,6 +57,23 @@ const MockInterview = () => {
       setRecentInterviews(data || []);
     } catch (error) {
       console.error("Error loading interview history:", error);
+    }
+  };
+
+  const loadUserCourses = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      setRecentCourses(data as CourseType[] || []);
+    } catch (error) {
+      console.error("Error loading course history:", error);
     }
   };
 
@@ -223,6 +243,7 @@ const MockInterview = () => {
       setStage(InterviewStage.Complete);
       
       if (interviewData) {
+        // Fix the Promise chain by adding a proper then/catch
         supabase
           .from('mock_interviews')
           .update({ completed: true })
@@ -239,12 +260,17 @@ const MockInterview = () => {
           })
           .catch(error => {
             console.error("Error updating interview status:", error);
+            toast({
+              title: "Error",
+              description: "Failed to update interview status.",
+              variant: "destructive",
+            });
           });
       }
     }
   };
 
-  const handleSubmitCourse = async (courseName: string, purpose: string, difficulty: string) => {
+  const handleSubmitCourse = async (courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -293,8 +319,8 @@ const MockInterview = () => {
         .from('courses')
         .insert({
           title: courseName,
-          purpose: purpose as any,
-          difficulty: difficulty as any,
+          purpose,
+          difficulty,
           content,
           user_id: user.id
         })
@@ -302,6 +328,9 @@ const MockInterview = () => {
         .single();
       
       if (courseError) throw courseError;
+      
+      // Update recent courses with type assertion
+      setRecentCourses(prev => [course as CourseType, ...prev]);
       
       toast({
         title: "Course Generated Successfully",
@@ -704,4 +733,3 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
-

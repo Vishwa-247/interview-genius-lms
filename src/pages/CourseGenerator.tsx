@@ -95,8 +95,8 @@ const CourseGenerator = () => {
       
       console.log("Course saved to database:", course);
       
-      // Update recent courses list
-      setRecentCourses(prev => [course, ...prev]);
+      // Update recent courses list - Fix the type issue by using type assertion
+      setRecentCourses(prev => [course as CourseType, ...prev]);
       
       toast({
         title: "Course Created!",
