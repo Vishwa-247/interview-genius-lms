@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -283,6 +284,11 @@ const MockInterview = () => {
     setIsGeneratingCourse(true);
     
     try {
+      toast({
+        title: "Generating Course",
+        description: "Please wait while we create your course. This may take a minute.",
+      });
+
       const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
         body: {
           action: 'generate_course',
@@ -294,7 +300,12 @@ const MockInterview = () => {
         }
       });
 
-      if (generationError) throw generationError;
+      if (generationError || !generatedData || !generatedData.data) {
+        console.error("Generation error:", generationError || "Failed to generate course content");
+        throw new Error("Failed to generate course content");
+      }
+      
+      console.log("Course generation successful:", generatedData);
       
       let summary = "An AI-generated course on " + courseName;
       let content = null;
@@ -732,4 +743,3 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
-
