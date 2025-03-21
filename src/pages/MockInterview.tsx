@@ -8,7 +8,7 @@ import VideoRecorder from "@/components/interview/VideoRecorder";
 import { useAuth } from "@/context/AuthContext";
 import { InterviewQuestionType, MockInterviewType } from "@/types";
 import Container from "@/components/ui/Container";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import CourseForm from "@/components/course/CourseForm";
 import { createMockInterview, getInterviewQuestionsByInterviewId, getUserMockInterviews, createCourse } from "@/services/api";
@@ -222,6 +222,14 @@ const MockInterview = () => {
     setStage(InterviewStage.Questions);
   };
 
+  const handleDownloadInterview = () => {
+    // In a real app, you would generate a downloadable file with the interview data
+    toast({
+      title: "Interview Downloaded",
+      description: "Your interview has been downloaded successfully.",
+    });
+  };
+
   const renderStage = () => {
     switch (stage) {
       case InterviewStage.Questions:
@@ -235,74 +243,183 @@ const MockInterview = () => {
         }
         
         return (
-          <div className="max-w-3xl mx-auto">
-            <div className="mb-6 flex items-center justify-between">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setStage(InterviewStage.Setup)}
-                className="text-muted-foreground"
-              >
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Cancel Interview
-              </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="mb-6 flex items-center justify-between">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setStage(InterviewStage.Setup)}
+                  className="text-muted-foreground"
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Cancel Interview
+                </Button>
+                
+                <span className="text-sm text-muted-foreground">
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                </span>
+              </div>
               
-              <span className="text-sm text-muted-foreground">
-                Question {currentQuestionIndex + 1} of {questions.length}
-              </span>
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Question {currentQuestionIndex + 1}</CardTitle>
+                  <CardDescription>
+                    Take a moment to think about your answer before recording.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 bg-muted rounded-md text-lg">
+                    {questions[currentQuestionIndex]?.question}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <div className="flex justify-center mt-4">
+                <Button 
+                  size="lg"
+                  onClick={() => setStage(InterviewStage.Recording)}
+                >
+                  Ready to Answer
+                </Button>
+              </div>
+
+              <Card className="mt-8">
+                <CardHeader>
+                  <CardTitle>Interview Tips</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Speak clearly and at a moderate pace</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Maintain eye contact with the camera</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Structure your answers using the STAR method</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Take a brief pause before answering to collect your thoughts</span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
             
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Question {currentQuestionIndex + 1}</CardTitle>
-                <CardDescription>
-                  Take a moment to think about your answer before recording.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-4 bg-muted rounded-md text-lg">
-                  {questions[currentQuestionIndex]?.question}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <div className="flex justify-center my-8">
-              <Button 
-                size="lg"
-                onClick={() => setStage(InterviewStage.Recording)}
-              >
-                Ready to Answer
-              </Button>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Camera Preview</CardTitle>
+                  <CardDescription>
+                    Check your camera and microphone before starting
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <VideoRecorder 
+                    onRecordingComplete={() => {}}
+                    isRecording={false}
+                    startRecording={() => {}}
+                    stopRecording={() => {}}
+                  />
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Save Your Interview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Download your interview session for future reference or to share with mentors.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="w-full" 
+                    onClick={handleDownloadInterview}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Interview
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
         );
       
       case InterviewStage.Recording:
         return (
-          <div className="max-w-3xl mx-auto">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">
-                Question {currentQuestionIndex + 1}: {questions[currentQuestionIndex]?.question}
-              </h2>
-              <p className="text-muted-foreground mb-4">
-                When you're ready, click "Start Recording" and begin your answer. We'll analyze both your verbal response and facial expressions.
-              </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-2">
+                  Question {currentQuestionIndex + 1}:
+                </h2>
+                <div className="p-4 bg-muted rounded-md text-lg mb-4">
+                  {questions[currentQuestionIndex]?.question}
+                </div>
+                <p className="text-muted-foreground">
+                  When you're ready, click "Start Recording" and begin your answer. We'll analyze both your verbal response and facial expressions.
+                </p>
+              </div>
+              
+              <Card className="mt-8">
+                <CardHeader>
+                  <CardTitle>Answering Tips</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Use specific examples from your experience</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Avoid filler words like "um" and "uh"</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      </div>
+                      <span>Speak confidently and maintain good posture</span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
             
-            <VideoRecorder 
-              onRecordingComplete={handleAnswerSubmitted}
-              isRecording={isRecording}
-              startRecording={startRecording}
-              stopRecording={stopRecording}
-            />
-            
-            <div className="mt-6 flex justify-center">
-              <Button 
-                variant="outline" 
-                onClick={handleCancel}
-              >
-                Cancel
-              </Button>
+            <div>
+              <VideoRecorder 
+                onRecordingComplete={handleAnswerSubmitted}
+                isRecording={isRecording}
+                startRecording={startRecording}
+                stopRecording={stopRecording}
+              />
+              
+              <div className="mt-6 flex justify-center">
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         );
