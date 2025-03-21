@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
@@ -439,4 +438,109 @@ export const analyzeInterviewResponse = async (
 
   if (error) throw error;
   return data;
+};
+
+// Study Material APIs
+export interface StudyMaterial {
+  id?: number;
+  course_id: string;
+  course_type: string;
+  topic: string;
+  difficulty_level?: string;
+  course_layout?: any; // JSONB data
+  created_by: string;
+  status?: string;
+  created_at?: string;
+}
+
+export const createStudyMaterial = async (studyMaterial: Omit<StudyMaterial, 'id' | 'created_at'>): Promise<StudyMaterial> => {
+  const { data, error } = await fromTable<StudyMaterial>('study_material')
+    .insert(studyMaterial)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as StudyMaterial;
+};
+
+export const getAllStudyMaterials = async (): Promise<StudyMaterial[]> => {
+  const { data, error } = await fromTable<StudyMaterial>('study_material')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("Error fetching study materials:", error);
+    return [];
+  }
+  return data as StudyMaterial[] || [];
+};
+
+export const getStudyMaterialById = async (id: number): Promise<StudyMaterial | null> => {
+  const { data, error } = await fromTable<StudyMaterial>('study_material')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching study material:", error);
+    return null;
+  }
+  return data as StudyMaterial | null;
+};
+
+export const updateStudyMaterialStatus = async (id: number, status: string): Promise<void> => {
+  const { error } = await fromTable<StudyMaterial>('study_material')
+    .update({ status })
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+export const updateStudyMaterialLayout = async (id: number, courseLayout: any): Promise<void> => {
+  const { error } = await fromTable<StudyMaterial>('study_material')
+    .update({ course_layout: courseLayout })
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+// User APIs
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  is_member: boolean;
+  created_at?: string;
+}
+
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  const { data, error } = await fromTable<UserProfile>('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching user profile:", error);
+    return null;
+  }
+  return data as UserProfile | null;
+};
+
+export const updateUserProfile = async (
+  userId: string, 
+  updates: Partial<Omit<UserProfile, 'id' | 'created_at'>>
+): Promise<void> => {
+  const { error } = await fromTable<UserProfile>('users')
+    .update(updates)
+    .eq('id', userId);
+
+  if (error) throw error;
+};
+
+export const updateMembershipStatus = async (userId: string, isMember: boolean): Promise<void> => {
+  const { error } = await fromTable<UserProfile>('users')
+    .update({ is_member: isMember })
+    .eq('id', userId);
+
+  if (error) throw error;
 };

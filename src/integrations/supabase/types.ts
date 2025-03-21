@@ -145,6 +145,66 @@ export type Database = {
         }
         Relationships: []
       }
+      study_material: {
+        Row: {
+          course_id: string
+          course_layout: Json | null
+          course_type: string
+          created_at: string
+          created_by: string
+          difficulty_level: string | null
+          id: number
+          status: string | null
+          topic: string
+        }
+        Insert: {
+          course_id: string
+          course_layout?: Json | null
+          course_type: string
+          created_at?: string
+          created_by: string
+          difficulty_level?: string | null
+          id?: number
+          status?: string | null
+          topic: string
+        }
+        Update: {
+          course_id?: string
+          course_layout?: Json | null
+          course_type?: string
+          created_at?: string
+          created_by?: string
+          difficulty_level?: string | null
+          id?: number
+          status?: string | null
+          topic?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_member: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_member?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_member?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
