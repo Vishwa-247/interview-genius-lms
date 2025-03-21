@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, User } from "lucide-react";
 import Container from "../ui/Container";
 import GlassMorphism from "../ui/GlassMorphism";
@@ -21,11 +21,13 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const navLinks = [
     { name: "Home", href: "/" },
     { name: "Learn", href: "/course-generator" },
     { name: "Interview", href: "/mock-interview" },
+    { name: "Future", href: "/future-integrations" },
     { name: "Dashboard", href: "/dashboard" },
   ];
 
@@ -49,6 +51,8 @@ const Navbar = () => {
 
   const handleSignOut = async () => {
     await signOut();
+    // Navigate to index page after logout
+    navigate('/');
   };
 
   const getInitials = (name: string) => {

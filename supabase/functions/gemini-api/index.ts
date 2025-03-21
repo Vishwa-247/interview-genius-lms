@@ -30,8 +30,39 @@ serve(async (req) => {
         requestBody = {
           contents: [{
             parts: [{
-              text: `Create a complete course on ${data.topic} for ${data.purpose} at ${data.difficulty} level. 
-                     Include a summary, list of chapters with detailed content, flashcards, multiple choice questions, and Q&A pairs.`
+              text: `Create a complete course on ${data.topic} for ${data.purpose} at ${data.difficulty} level.
+                     
+                     Follow this exact structure:
+                     
+                     # SUMMARY
+                     Provide a concise overview of what the course covers and its objectives.
+                     
+                     # CHAPTERS
+                     Create 5-8 logically structured chapters. For each chapter:
+                     - Title: Clear and descriptive chapter title
+                     - Content: Detailed and comprehensive content with examples, explanations, and relevant concepts
+                     
+                     # FLASHCARDS
+                     Create at least 15 flashcards in this format:
+                     - Question: [question text]
+                     - Answer: [answer text]
+                     
+                     # MCQs (Multiple Choice Questions)
+                     Create at least 10 multiple choice questions in this format:
+                     - Question: [question text]
+                     - Options: 
+                       a) [option text]
+                       b) [option text]
+                       c) [option text]
+                       d) [option text]
+                     - Correct Answer: [correct letter]
+                     
+                     # Q&A PAIRS
+                     Create at least 10 question and answer pairs for deeper understanding:
+                     - Question: [detailed question]
+                     - Answer: [comprehensive answer]
+                     
+                     Make sure the entire course is educational, accurate, and provides comprehensive knowledge on ${data.topic}. Adapt the content to be appropriate for ${data.purpose} at ${data.difficulty} level.`
             }]
           }],
           generationConfig: {
@@ -50,6 +81,13 @@ serve(async (req) => {
             parts: [{
               text: `Generate ${data.questionCount || 5} interview questions for a ${data.experience} years experienced ${data.jobRole} 
                      with expertise in ${data.techStack}. The questions should be challenging and relevant to the role.
+                     
+                     For each question:
+                     1. Focus on both technical knowledge and practical application
+                     2. Include questions that test problem-solving abilities
+                     3. Add questions about handling specific scenarios they might encounter
+                     4. Include questions about their approach to teamwork and collaboration
+                     
                      Format the response as a numbered list with just the questions.`
             }]
           }],
@@ -102,6 +140,31 @@ serve(async (req) => {
                      5. Technical accuracy (correct use of technical terms)
                      
                      Provide a rating for each category (0-100) and specific feedback on how to improve.`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+          }
+        };
+        break;
+
+      case 'analyze_facial_expression':
+        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        requestBody = {
+          contents: [{
+            parts: [{
+              text: `Analyze this description of facial expressions during an interview:
+                     
+                     ${data.facialData}
+                     
+                     Provide feedback on:
+                     1. Overall impression (how the candidate appears to interviewers)
+                     2. Confidence signals (what expressions indicate confidence or lack thereof)
+                     3. Engagement level (how engaged the person appears to be)
+                     4. Improvement suggestions (specific tips to improve facial expressions)
+                     
+                     Include specific techniques the candidate can practice to improve their non-verbal communication.`
             }]
           }],
           generationConfig: {

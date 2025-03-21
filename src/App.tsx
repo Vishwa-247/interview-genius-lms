@@ -12,6 +12,7 @@ import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import CourseDetail from "./pages/CourseDetail";
 import InterviewResult from "./pages/InterviewResult";
+import FutureIntegrations from "./pages/FutureIntegrations";
 import Auth from "./pages/Auth";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
@@ -47,8 +48,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Layout><Index /></Layout>} />
+            <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/future-integrations" element={<Layout><FutureIntegrations /></Layout>} />
             <Route path="/course-generator" element={
               <Layout>
                 <ProtectedRoute>

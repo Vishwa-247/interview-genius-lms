@@ -19,7 +19,7 @@ export default function Layout({
   return (
     <div className="min-h-screen flex flex-col">
       {withNavbar && <Navbar />}
-      <main className={cn("flex-1 pt-24", className)}>
+      <main className={cn("flex-1 pt-28", className)}>
         {children}
       </main>
       {withFooter && (
