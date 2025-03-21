@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || "AIzaSyBgMvHfIYb06Bn3oBi8Y-ykFR7J_n5zx18";
     
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY is not set in environment variables');
@@ -178,6 +178,7 @@ serve(async (req) => {
         throw new Error(`Unsupported action: ${action}`);
     }
 
+    console.log(`Making request to Gemini API: ${endpoint}`);
     const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -193,6 +194,7 @@ serve(async (req) => {
     }
 
     const responseData = await response.json();
+    console.log('Gemini API response received successfully');
     
     return new Response(JSON.stringify({
       success: true,

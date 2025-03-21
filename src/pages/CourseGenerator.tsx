@@ -7,8 +7,8 @@ import Container from "@/components/ui/Container";
 import { Loader2 } from "lucide-react";
 import CourseForm from "@/components/course/CourseForm";
 import { useAuth } from "@/context/AuthContext";
-import { createCourse, generateCourseContent } from "@/services/api";
 import { CourseType } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 const CourseGenerator = () => {
   const navigate = useNavigate();
@@ -35,33 +35,65 @@ const CourseGenerator = () => {
         description: "Please wait while we create your course. This may take a minute.",
       });
 
-      // Generate course content with AI
-      const generatedData = await generateCourseContent(courseName, purpose, difficulty);
-      
-      if (!generatedData || !generatedData.data) {
+      // Call the Gemini API through our Supabase Edge Function
+      const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
+        body: {
+          action: 'generate_course',
+          data: {
+            topic: courseName,
+            purpose,
+            difficulty
+          }
+        }
+      });
+
+      if (generationError || !generatedData || !generatedData.data) {
+        console.error("Generation error:", generationError || "Failed to generate course content");
         throw new Error("Failed to generate course content");
       }
       
+      console.log("Course generation successful:", generatedData);
+      
       // Extract summary from the generated content
       let summary = "An AI-generated course on " + courseName;
+      let content = null;
+      
       try {
         const text = generatedData.data.candidates[0].content.parts[0].text;
-        const summaryMatch = text.match(/summary:([^#]+)/i) || text.match(/introduction:([^#]+)/i);
+        const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
+        
         if (summaryMatch && summaryMatch[1]) {
           summary = summaryMatch[1].trim().substring(0, 500);
         }
+        
+        // Store the full content for later use
+        content = {
+          fullText: text,
+          generatedAt: new Date().toISOString()
+        };
+        
       } catch (e) {
         console.error("Error extracting summary:", e);
       }
       
       // Create course in database
-      const course = await createCourse(
-        courseName,
-        purpose,
-        difficulty,
-        summary,
-        user.id
-      );
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          title: courseName,
+          purpose,
+          difficulty,
+          content,
+          user_id: user.id
+        })
+        .select()
+        .single();
+      
+      if (courseError) {
+        throw courseError;
+      }
+      
+      console.log("Course saved to database:", course);
       
       // Update recent courses list
       setRecentCourses(prev => [course, ...prev]);
@@ -130,7 +162,7 @@ const CourseGenerator = () => {
       {isLoading && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-card p-8 rounded-lg shadow-lg max-w-md w-full text-center space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+            <Loader2 className="h-12 w-12 animate-spin mx-auto" />
             <h3 className="text-xl font-semibold">Generating Your Course</h3>
             <p className="text-muted-foreground">
               Please wait while our AI creates your personalized course. This may take a minute or two.

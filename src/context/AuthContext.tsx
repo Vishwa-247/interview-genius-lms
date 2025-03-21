@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,10 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Function to sync user data with our users table
   const syncUserProfile = async (userId: string, fullName: string, email: string) => {
     try {
+      console.log("Syncing user profile:", { userId, fullName, email });
+      
       const { error } = await supabase
         .from('users')
         .upsert({
@@ -36,7 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           onConflict: 'id'
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error syncing user profile:", error);
+        throw error;
+      }
+      
+      console.log("User profile synced successfully");
     } catch (error: any) {
       console.error("Error syncing user profile:", error.message);
       toast({
@@ -94,10 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      
       toast({
         title: "Welcome back!",
         description: "You have successfully signed in."
       });
+      
+      navigate('/dashboard');
     } catch (error: any) {
       toast({
         title: "Error signing in",
@@ -119,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           data: {
             full_name: fullName,
-            role: 'user', // Adding a default role
+            role: 'user',
           },
         },
       });
@@ -135,6 +145,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Account created!",
         description: "Check your email for the confirmation link."
       });
+      
+      // Redirect to dashboard if email confirmation is not required
+      // Otherwise, stay on the current page with a message to check email
+      if (data?.session) {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       toast({
         title: "Error creating account",
@@ -153,11 +169,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // After successful sign out, we'll navigate to the index page in the component
       toast({
         title: "Signed out",
         description: "You have been signed out successfully."
       });
+      
+      navigate('/');
     } catch (error: any) {
       toast({
         title: "Error signing out",
