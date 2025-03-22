@@ -8,7 +8,7 @@ import VideoRecorder from "@/components/interview/VideoRecorder";
 import { useAuth } from "@/context/AuthContext";
 import { InterviewQuestionType, MockInterviewType, CourseType } from "@/types";
 import Container from "@/components/ui/Container";
-import { ChevronLeft, Download, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import CourseForm from "@/components/course/CourseForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ const MockInterview = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recentInterviews, setRecentInterviews] = useState<MockInterviewType[]>([]);
   const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
+  const [recordingComplete, setRecordingComplete] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -225,7 +226,7 @@ const MockInterview = () => {
         description: "Your answer has been recorded successfully.",
       });
       
-      handleNextQuestion();
+      setRecordingComplete(true);
     } catch (error) {
       console.error("Error saving answer:", error);
       toast({
@@ -236,37 +237,40 @@ const MockInterview = () => {
     }
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
+    setRecordingComplete(false);
+    
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
+      setStage(InterviewStage.Questions);
     } else {
       setStage(InterviewStage.Complete);
       
       if (interviewData) {
-        (async () => {
-          try {
-            await supabase
-              .from('mock_interviews')
-              .update({ completed: true })
-              .eq('id', interviewData.id);
-              
-            toast({
-              title: "Interview Completed",
-              description: "Your interview has been completed. Preparing your results...",
-            });
+        try {
+          const { error } = await supabase
+            .from('mock_interviews')
+            .update({ completed: true })
+            .eq('id', interviewData.id);
             
-            setTimeout(() => {
-              navigate(`/interview-result/${interviewData.id}`);
-            }, 2000);
-          } catch (error) {
-            console.error("Error updating interview status:", error);
-            toast({
-              title: "Error",
-              description: "Failed to update interview status.",
-              variant: "destructive",
-            });
-          }
-        })();
+          if (error) throw error;
+            
+          toast({
+            title: "Interview Completed",
+            description: "Your interview has been completed. Preparing your results...",
+          });
+          
+          setTimeout(() => {
+            navigate(`/interview-result/${interviewData.id}`);
+          }, 2000);
+        } catch (error) {
+          console.error("Error updating interview status:", error);
+          toast({
+            title: "Error",
+            description: "Failed to update interview status.",
+            variant: "destructive",
+          });
+        }
       }
     }
   };
@@ -362,6 +366,7 @@ const MockInterview = () => {
 
   const startRecording = () => {
     setIsRecording(true);
+    setRecordingComplete(false);
   };
   
   const stopRecording = () => {
@@ -370,6 +375,7 @@ const MockInterview = () => {
   
   const handleCancel = () => {
     setStage(InterviewStage.Questions);
+    setRecordingComplete(false);
   };
 
   const handleDownloadInterview = () => {
@@ -553,7 +559,7 @@ const MockInterview = () => {
               </Card>
             </div>
             
-            <div>
+            <div className="space-y-6">
               <VideoRecorder 
                 onRecordingComplete={handleAnswerSubmitted}
                 isRecording={isRecording}
@@ -561,13 +567,23 @@ const MockInterview = () => {
                 stopRecording={stopRecording}
               />
               
-              <div className="mt-6 flex justify-center">
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancel}
-                >
-                  Cancel
-                </Button>
+              <div className="mt-6 flex justify-center space-x-4">
+                {recordingComplete ? (
+                  <Button 
+                    onClick={handleNextQuestion}
+                    className="px-6 py-3 bg-primary text-white rounded-lg flex items-center space-x-2"
+                  >
+                    <span>Next Question</span>
+                    <ChevronRight size={16} />
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleCancel}
+                  >
+                    Cancel
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -605,7 +621,7 @@ const MockInterview = () => {
       <div className="mt-12">
         <h2 className="text-xl font-semibold mb-4">Recent Mock Interviews</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recentInterviews.map((interview, index) => (
+          {recentInterviews.map((interview) => (
             <Card key={interview.id} className="overflow-hidden">
               <CardHeader className="pb-4">
                 <div className="flex justify-between items-start">

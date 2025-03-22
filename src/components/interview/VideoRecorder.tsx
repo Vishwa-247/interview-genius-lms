@@ -19,6 +19,7 @@ const VideoRecorder = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
   
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -28,6 +29,11 @@ const VideoRecorder = ({
   useEffect(() => {
     const initCamera = async () => {
       try {
+        // Stop any existing stream first
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
+        
         const stream = await navigator.mediaDevices.getUserMedia({
           video: videoEnabled,
           audio: audioEnabled,
@@ -38,25 +44,27 @@ const VideoRecorder = ({
         }
         
         streamRef.current = stream;
-        mediaRecorderRef.current = new MediaRecorder(stream);
         
-        const chunks: BlobPart[] = [];
+        // Create a new MediaRecorder
+        mediaRecorderRef.current = new MediaRecorder(stream);
+        chunksRef.current = [];
         
         mediaRecorderRef.current.ondataavailable = (e) => {
           if (e.data.size > 0) {
-            chunks.push(e.data);
+            chunksRef.current.push(e.data);
           }
         };
         
         mediaRecorderRef.current.onstop = () => {
-          const blob = new Blob(chunks, { type: "video/webm" });
+          const blob = new Blob(chunksRef.current, { type: "video/webm" });
           onRecordingComplete(blob);
+          chunksRef.current = []; // Clear chunks after completion
         };
         
         setError("");
       } catch (err) {
-        setError("Could not access camera or microphone. Please check permissions.");
         console.error("Error accessing media devices:", err);
+        setError("Could not access camera or microphone. Please check permissions.");
       }
     };
     
@@ -68,6 +76,26 @@ const VideoRecorder = ({
       }
     };
   }, [videoEnabled, audioEnabled, onRecordingComplete]);
+  
+  // Watch for isRecording state changes
+  useEffect(() => {
+    if (isRecording && mediaRecorderRef.current && mediaRecorderRef.current.state !== "recording") {
+      try {
+        mediaRecorderRef.current.start();
+        console.log("Recording started");
+      } catch (err) {
+        console.error("Error starting recording:", err);
+        setError("Could not start recording. Please refresh and try again.");
+      }
+    } else if (!isRecording && mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      try {
+        mediaRecorderRef.current.stop();
+        console.log("Recording stopped");
+      } catch (err) {
+        console.error("Error stopping recording:", err);
+      }
+    }
+  }, [isRecording]);
   
   const toggleVideo = () => {
     if (streamRef.current) {
@@ -94,10 +122,7 @@ const VideoRecorder = ({
       setCountdown((prev) => {
         if (prev === 1) {
           clearInterval(countdownTimer);
-          if (mediaRecorderRef.current) {
-            mediaRecorderRef.current.start();
-            startRecording();
-          }
+          startRecording();
           return null;
         }
         return prev ? prev - 1 : null;
@@ -106,10 +131,7 @@ const VideoRecorder = ({
   };
   
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop();
-      stopRecording();
-    }
+    stopRecording();
   };
   
   return (
