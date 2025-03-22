@@ -78,21 +78,22 @@ const CourseGenerator = () => {
       
       try {
         const text = generatedData.data.candidates[0].content.parts[0].text;
-        const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
         
-        if (summaryMatch && summaryMatch[1]) {
-          summary = summaryMatch[1].trim().substring(0, 500);
-        }
+        // Parse the full text into structured content
+        const parsedContent = parseGeneratedContent(text);
         
-        // Store the full content for later use
+        // Use the parsed summary or fallback
+        summary = parsedContent.summary || summary;
+        
+        // Store the structured content instead of raw text
         content = {
-          fullText: text,
+          parsedContent,
           generatedAt: new Date().toISOString()
         };
         
         console.log("Content processed successfully, saving to database...");
       } catch (e) {
-        console.error("Error extracting summary:", e);
+        console.error("Error extracting content:", e);
       }
       
       // Create course in database
@@ -136,6 +137,101 @@ const CourseGenerator = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to parse the generated content
+  const parseGeneratedContent = (text: string) => {
+    const parsedContent: any = {
+      summary: "",
+      chapters: [],
+      flashcards: [],
+      mcqs: [],
+      qnas: []
+    };
+
+    // Extract summary
+    const summaryMatch = text.match(/# SUMMARY\s*\n([\s\S]*?)(?=\n# |\n## |$)/i);
+    if (summaryMatch && summaryMatch[1]) {
+      parsedContent.summary = summaryMatch[1].trim();
+    }
+
+    // Extract chapters
+    const chaptersSection = text.match(/# CHAPTERS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (chaptersSection && chaptersSection[1]) {
+      const chaptersText = chaptersSection[1];
+      const chapterBlocks = chaptersText.split(/\n(?=## )/g);
+      
+      parsedContent.chapters = chapterBlocks.map((block, index) => {
+        const titleMatch = block.match(/## (.*)/);
+        const title = titleMatch ? titleMatch[1].trim() : `Chapter ${index + 1}`;
+        const content = block.replace(/## .*\n/, '').trim();
+        
+        return {
+          title,
+          content,
+          order_number: index + 1
+        };
+      });
+    }
+
+    // Extract flashcards
+    const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (flashcardsSection && flashcardsSection[1]) {
+      const flashcardsText = flashcardsSection[1];
+      const flashcardMatches = [...flashcardsText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+      
+      parsedContent.flashcards = flashcardMatches.map((match, index) => ({
+        question: match[1].trim(),
+        answer: match[2].trim()
+      }));
+    }
+
+    // Extract MCQs
+    const mcqsSection = text.match(/# MCQs[\s\S]*?Multiple Choice Questions\)?\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (mcqsSection && mcqsSection[1]) {
+      const mcqsText = mcqsSection[1];
+      const mcqBlocks = mcqsText.split(/\n(?=- Question: )/g);
+      
+      parsedContent.mcqs = mcqBlocks.filter(block => block.includes('- Question:')).map(block => {
+        const questionMatch = block.match(/- Question: ([\s\S]*?)(?=\n- Options:|\n|$)/);
+        const optionsText = block.match(/- Options:\s*\n([\s\S]*?)(?=\n- Correct Answer:|\n|$)/);
+        const correctAnswerMatch = block.match(/- Correct Answer: ([a-d])/i);
+        
+        const question = questionMatch ? questionMatch[1].trim() : '';
+        
+        let options: string[] = [];
+        if (optionsText && optionsText[1]) {
+          options = optionsText[1]
+            .split(/\n\s*/)
+            .filter(line => /^[a-d]\)/.test(line))
+            .map(line => line.replace(/^[a-d]\)\s*/, '').trim());
+        }
+        
+        const correctAnswer = correctAnswerMatch ? 
+          options[correctAnswerMatch[1].charCodeAt(0) - 'a'.charCodeAt(0)] : 
+          '';
+        
+        return {
+          question,
+          options,
+          correct_answer: correctAnswer
+        };
+      });
+    }
+
+    // Extract Q&As
+    const qnasSection = text.match(/# Q&A PAIRS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (qnasSection && qnasSection[1]) {
+      const qnasText = qnasSection[1];
+      const qnaMatches = [...qnasText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+      
+      parsedContent.qnas = qnaMatches.map((match, index) => ({
+        question: match[1].trim(),
+        answer: match[2].trim()
+      }));
+    }
+
+    return parsedContent;
   };
 
   return (
