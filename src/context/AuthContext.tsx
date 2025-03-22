@@ -57,45 +57,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // Sync user profile if session exists
-      if (session?.user) {
-        const { id, email, user_metadata } = session.user;
-        const fullName = user_metadata?.full_name || '';
+    let mounted = true;
+    
+    async function initializeAuth() {
+      try {
+        // Set loading state
+        if (mounted) setIsLoading(true);
         
-        if (id && email) {
-          syncUserProfile(id, fullName, email);
+        // Get initial session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // Sync user profile if session exists
+          if (session?.user) {
+            const { id, email, user_metadata } = session.user;
+            const fullName = user_metadata?.full_name || '';
+            
+            if (id && email) {
+              await syncUserProfile(id, fullName, email);
+            }
+          }
         }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-      
-      setIsLoading(false);
-    });
-
+    }
+    
+    // Initialize auth
+    initializeAuth();
+    
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Sync user profile if session exists
-        if (session?.user) {
-          const { id, email, user_metadata } = session.user;
-          const fullName = user_metadata?.full_name || '';
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
           
-          if (id && email) {
-            await syncUserProfile(id, fullName, email);
+          // Sync user profile if session exists
+          if (session?.user) {
+            const { id, email, user_metadata } = session.user;
+            const fullName = user_metadata?.full_name || '';
+            
+            if (id && email) {
+              await syncUserProfile(id, fullName, email);
+            }
           }
         }
-        
-        setIsLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -168,6 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setIsLoading(true);
+      
+      // First clear local state
+      setUser(null);
+      setSession(null);
+      
+      // Then call supabase signOut
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -176,7 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: "You have been signed out successfully."
       });
       
-      navigate('/');
+      // Force navigation to home page
+      window.location.href = "/";
     } catch (error: any) {
       toast({
         title: "Error signing out",

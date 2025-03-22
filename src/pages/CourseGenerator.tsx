@@ -35,7 +35,12 @@ const CourseGenerator = () => {
         description: "Please wait while we create your course. This may take a minute.",
       });
 
-      // Call the Gemini API through our Supabase Edge Function
+      console.log("Starting course generation for:", courseName);
+      
+      // Call the Gemini API through our Supabase Edge Function with timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      
       const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
         body: {
           action: 'generate_course',
@@ -44,15 +49,18 @@ const CourseGenerator = () => {
             purpose,
             difficulty
           }
-        }
+        },
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (generationError || !generatedData || !generatedData.data) {
         console.error("Generation error:", generationError || "Failed to generate course content");
-        throw new Error("Failed to generate course content");
+        throw new Error(generationError?.message || "Failed to generate course content");
       }
       
-      console.log("Course generation successful:", generatedData);
+      console.log("Course generation successful, processing response...");
       
       // Extract summary from the generated content
       let summary = "An AI-generated course on " + courseName;
@@ -72,6 +80,7 @@ const CourseGenerator = () => {
           generatedAt: new Date().toISOString()
         };
         
+        console.log("Content processed successfully, saving to database...");
       } catch (e) {
         console.error("Error extracting summary:", e);
       }
@@ -90,6 +99,7 @@ const CourseGenerator = () => {
         .single();
       
       if (courseError) {
+        console.error("Error saving course to database:", courseError);
         throw courseError;
       }
       
@@ -106,11 +116,11 @@ const CourseGenerator = () => {
       // Navigate to the course detail page
       navigate(`/course/${course.id}`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating course:", error);
       toast({
         title: "Error",
-        description: "Failed to generate course. Please try again later.",
+        description: error.message || "Failed to generate course. Please try again later.",
         variant: "destructive",
       });
     } finally {

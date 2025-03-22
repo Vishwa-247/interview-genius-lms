@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -13,6 +12,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Edge function invoked");
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || "AIzaSyBgMvHfIYb06Bn3oBi8Y-ykFR7J_n5zx18";
     
     if (!GEMINI_API_KEY) {
@@ -20,6 +20,7 @@ serve(async (req) => {
     }
 
     const { action, data } = await req.json();
+    console.log(`Processing ${action} request with data:`, data);
 
     let endpoint = '';
     let requestBody = {};
@@ -178,30 +179,48 @@ serve(async (req) => {
         throw new Error(`Unsupported action: ${action}`);
     }
 
-    console.log(`Making request to Gemini API: ${endpoint}`);
-    const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Error from Gemini API:', errorData);
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
-
-    const responseData = await response.json();
-    console.log('Gemini API response received successfully');
+    console.log(`Making request to Gemini API: ${endpoint} with action: ${action}`);
     
-    return new Response(JSON.stringify({
-      success: true,
-      data: responseData
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Set a timeout for the API call
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+    
+    try {
+      const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Error from Gemini API:', errorData);
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      console.log(`Gemini API response received successfully for ${action}`);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        data: responseData
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      if (fetchError.name === 'AbortError') {
+        console.error('Gemini API request timed out');
+        throw new Error('API request timed out. Please try again later.');
+      }
+      throw fetchError;
+    }
+    
   } catch (error) {
     console.error('Error in gemini-api function:', error);
     return new Response(JSON.stringify({
