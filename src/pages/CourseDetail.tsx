@@ -40,6 +40,14 @@ const renderMarkdown = (content: string) => {
     .replace(/\`([^\`]+)\`/g, '<code class="bg-muted px-1 py-0.5 rounded text-sm">$1</code>');
 };
 
+// Type guard to check if content is a valid object with parsedContent
+const isValidContentObject = (content: any): content is { parsedContent: any } => {
+  return content !== null && 
+         typeof content === 'object' && 
+         'parsedContent' in content && 
+         content.parsedContent !== null;
+};
+
 const CourseDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
@@ -89,8 +97,8 @@ const CourseDetail = () => {
         
         setCourse(courseData as CourseType);
         
-        // Process content from the course data
-        if (courseData.content && courseData.content.parsedContent) {
+        // Process content from the course data - with better type checking
+        if (courseData.content && isValidContentObject(courseData.content)) {
           const { parsedContent } = courseData.content;
           
           // Process chapters
@@ -143,6 +151,8 @@ const CourseDetail = () => {
             }));
             setQnas(processedQnas);
           }
+        } else {
+          console.log("Course content is not in the expected format:", courseData.content);
         }
       } catch (error) {
         console.error("Error in useEffect:", error);
