@@ -18,7 +18,8 @@ export const createCourse = async (
       purpose,
       difficulty,
       summary,
-      user_id: userId
+      user_id: userId,
+      content: { status: 'pending' } // Add a status to indicate it's newly created
     })
     .select()
     .single();
@@ -57,7 +58,11 @@ export const getUserCourses = async (): Promise<CourseType[]> => {
   return getAllCourses(userData.user.id);
 };
 
-export const checkCourseGenerationStatus = async (courseId: string): Promise<boolean> => {
+export const checkCourseGenerationStatus = async (courseId: string): Promise<{
+  isComplete: boolean;
+  status: string;
+  error?: string;
+}> => {
   const { data, error } = await fromTable<CourseType>('courses')
     .select('content')
     .eq('id', courseId)
@@ -65,7 +70,33 @@ export const checkCourseGenerationStatus = async (courseId: string): Promise<boo
     
   if (error) throw error;
   
-  return !!(data?.content && typeof data.content === 'object' && !('error' in data.content));
+  if (!data?.content || typeof data.content !== 'object') {
+    return { isComplete: false, status: 'unknown' };
+  }
+  
+  const content = data.content as any;
+  return { 
+    isComplete: content.status === 'complete',
+    status: content.status || 'unknown',
+    error: content.message
+  };
+};
+
+export const updateCourseContent = async (
+  courseId: string,
+  content: any,
+  summary?: string
+): Promise<void> => {
+  const updates: any = { content };
+  if (summary) {
+    updates.summary = summary;
+  }
+  
+  const { error } = await fromTable<CourseType>('courses')
+    .update(updates)
+    .eq('id', courseId);
+    
+  if (error) throw error;
 };
 
 export const createChapters = async (
@@ -430,6 +461,37 @@ export const analyzeInterviewResponse = async (
   return data;
 };
 
+export const startCourseGeneration = async (
+  courseId: string,
+  topic: string, 
+  purpose: CourseType['purpose'], 
+  difficulty: CourseType['difficulty']
+): Promise<void> => {
+  try {
+    const { data: generatedData, error } = await supabase.functions.invoke('gemini-api', {
+      body: {
+        action: 'generate_course',
+        data: {
+          courseId,
+          topic,
+          purpose,
+          difficulty
+        }
+      }
+    });
+
+    if (error) {
+      console.error("Error invoking gemini-api:", error);
+      throw error;
+    }
+    
+    return generatedData;
+  } catch (error) {
+    console.error("Error in startCourseGeneration:", error);
+    throw error;
+  }
+};
+
 export interface StudyMaterial {
   id?: number;
   course_id: string;
@@ -532,4 +594,3 @@ export const updateMembershipStatus = async (userId: string, isMember: boolean):
 
   if (error) throw error;
 };
-

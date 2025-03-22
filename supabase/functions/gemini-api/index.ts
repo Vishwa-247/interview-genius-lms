@@ -24,6 +24,7 @@ serve(async (req) => {
 
     let endpoint = '';
     let requestBody = {};
+    let responseHandler;
 
     switch (action) {
       case 'generate_course':
@@ -73,6 +74,22 @@ serve(async (req) => {
             maxOutputTokens: 8192,
           }
         };
+        
+        // If courseId is provided, this is a background generation request
+        if (data.courseId) {
+          // Process in background and immediately return success
+          EdgeRuntime.waitUntil(
+            processBackgroundCourseGeneration(GEMINI_API_KEY, endpoint, requestBody, data.courseId, data.topic)
+          );
+          
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Course generation started in background",
+            data: { status: 'generating' }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         break;
 
       case 'generate_interview_questions':
@@ -232,3 +249,113 @@ serve(async (req) => {
     });
   }
 });
+
+// Background processing function
+async function processBackgroundCourseGeneration(
+  apiKey: string,
+  endpoint: string,
+  requestBody: any,
+  courseId: string,
+  topic: string
+) {
+  console.log(`Starting background course generation for course ${courseId}`);
+  
+  try {
+    // Create Supabase admin client for updating the database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
+    
+    // Update course status to generating
+    await supabaseAdmin
+      .from('courses')
+      .update({ 
+        content: { status: 'generating', lastUpdated: new Date().toISOString() } 
+      })
+      .eq('id', courseId);
+      
+    // Call Gemini API
+    const response = await fetch(`${endpoint}?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Background generation error from Gemini API:', errorData);
+      
+      await supabaseAdmin
+        .from('courses')
+        .update({ 
+          content: { 
+            status: 'error', 
+            message: `API error: ${response.status} ${response.statusText}`,
+            lastUpdated: new Date().toISOString()
+          } 
+        })
+        .eq('id', courseId);
+        
+      return;
+    }
+    
+    const responseData = await response.json();
+    console.log(`Background generation completed successfully for course ${courseId}`);
+    
+    // Extract text content
+    const text = responseData.candidates[0].content.parts[0].text;
+    
+    // Extract summary
+    let summary = `An AI-generated course on ${topic}`;
+    const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
+    if (summaryMatch && summaryMatch[1]) {
+      summary = summaryMatch[1].trim().substring(0, 500);
+    }
+    
+    // Update course with complete content
+    await supabaseAdmin
+      .from('courses')
+      .update({ 
+        summary,
+        content: {
+          status: 'complete',
+          fullText: text,
+          generatedAt: new Date().toISOString(),
+          parsedContent: text
+        } 
+      })
+      .eq('id', courseId);
+      
+    console.log(`Course ${courseId} updated with generated content`);
+    
+  } catch (error) {
+    console.error(`Error in background processing for course ${courseId}:`, error);
+    
+    // Try to update the course with error status
+    try {
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') || '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      );
+      
+      await supabaseAdmin
+        .from('courses')
+        .update({ 
+          content: { 
+            status: 'error', 
+            message: error.message || 'Unknown error during background processing',
+            lastUpdated: new Date().toISOString()
+          } 
+        })
+        .eq('id', courseId);
+    } catch (updateError) {
+      console.error(`Failed to update error status for course ${courseId}:`, updateError);
+    }
+  }
+}
+
+// Import createClient for Supabase admin operations in background processing
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';

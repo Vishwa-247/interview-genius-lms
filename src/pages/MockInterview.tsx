@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -36,6 +35,14 @@ const MockInterview = () => {
   const [recentInterviews, setRecentInterviews] = useState<MockInterviewType[]>([]);
   const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
   const [recordingComplete, setRecordingComplete] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -55,7 +62,9 @@ const MockInterview = () => {
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      setRecentInterviews(data || []);
+      if (isMounted.current) {
+        setRecentInterviews(data || []);
+      }
     } catch (error) {
       console.error("Error loading interview history:", error);
     }
@@ -72,7 +81,9 @@ const MockInterview = () => {
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      setRecentCourses(data as CourseType[] || []);
+      if (isMounted.current) {
+        setRecentCourses(data as CourseType[] || []);
+      }
     } catch (error) {
       console.error("Error loading course history:", error);
     }
@@ -105,6 +116,8 @@ const MockInterview = () => {
       
       if (interviewError) throw interviewError;
       
+      if (!isMounted.current) return;
+      
       setInterviewData(interview);
       console.log("Interview created:", interview);
 
@@ -119,6 +132,8 @@ const MockInterview = () => {
           }
         }
       });
+
+      if (!isMounted.current) return;
 
       if (generationError) throw generationError;
       
@@ -152,6 +167,8 @@ const MockInterview = () => {
         ];
       }
       
+      if (!isMounted.current) return;
+      
       const questionsToInsert = questionList.map((question, index) => ({
         interview_id: interview.id,
         question,
@@ -164,6 +181,8 @@ const MockInterview = () => {
         .select();
         
       if (questionsError) throw questionsError;
+      
+      if (!isMounted.current) return;
       
       console.log("Questions saved:", savedQuestions);
       setQuestions(savedQuestions);
@@ -178,13 +197,17 @@ const MockInterview = () => {
       });
     } catch (error) {
       console.error("Error setting up interview:", error);
-      toast({
-        title: "Error",
-        description: "Failed to set up the interview. Please try again.",
-        variant: "destructive",
-      });
+      if (isMounted.current) {
+        toast({
+          title: "Error",
+          description: "Failed to set up the interview. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -198,15 +221,19 @@ const MockInterview = () => {
         
       if (error) throw error;
       
-      setQuestions(data || []);
-      setCurrentQuestionIndex(0);
+      if (isMounted.current) {
+        setQuestions(data || []);
+        setCurrentQuestionIndex(0);
+      }
     } catch (error) {
       console.error("Error fetching questions:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load interview questions.",
-        variant: "destructive",
-      });
+      if (isMounted.current) {
+        toast({
+          title: "Error",
+          description: "Failed to load interview questions.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -221,19 +248,22 @@ const MockInterview = () => {
         
       if (error) throw error;
       
-      toast({
-        title: "Answer Recorded",
-        description: "Your answer has been recorded successfully.",
-      });
-      
-      setRecordingComplete(true);
+      if (isMounted.current) {
+        toast({
+          title: "Answer Recorded",
+          description: "Your answer has been recorded successfully.",
+        });
+        setRecordingComplete(true);
+      }
     } catch (error) {
       console.error("Error saving answer:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save your answer. Please try again.",
-        variant: "destructive",
-      });
+      if (isMounted.current) {
+        toast({
+          title: "Error",
+          description: "Failed to save your answer. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -254,22 +284,30 @@ const MockInterview = () => {
             .eq('id', interviewData.id);
             
           if (error) throw error;
-            
-          toast({
-            title: "Interview Completed",
-            description: "Your interview has been completed. Preparing your results...",
-          });
           
-          setTimeout(() => {
-            navigate(`/interview-result/${interviewData.id}`);
-          }, 2000);
+          if (isMounted.current) {
+            toast({
+              title: "Interview Completed",
+              description: "Your interview has been completed. Preparing your results...",
+            });
+            
+            const timeoutId = setTimeout(() => {
+              if (isMounted.current) {
+                navigate(`/interview-result/${interviewData.id}`);
+              }
+            }, 2000);
+            
+            return () => clearTimeout(timeoutId);
+          }
         } catch (error) {
           console.error("Error updating interview status:", error);
-          toast({
-            title: "Error",
-            description: "Failed to update interview status.",
-            variant: "destructive",
-          });
+          if (isMounted.current) {
+            toast({
+              title: "Error",
+              description: "Failed to update interview status.",
+              variant: "destructive",
+            });
+          }
         }
       }
     }
@@ -293,75 +331,142 @@ const MockInterview = () => {
         description: "Please wait while we create your course. This may take a minute.",
       });
 
-      const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
-        body: {
-          action: 'generate_course',
-          data: {
-            topic: courseName,
-            purpose,
-            difficulty
+      const coursePromise = generateCourse(courseName, purpose, difficulty, user.id);
+      
+      const timeoutId = setTimeout(() => {
+        if (isMounted.current) {
+          toast({
+            title: "Course Generation Started",
+            description: "Your course is being generated in the background. You can navigate away and check back later.",
+          });
+        }
+      }, 3000);
+      
+      coursePromise
+        .then((course) => {
+          clearTimeout(timeoutId);
+          if (isMounted.current) {
+            setRecentCourses(prev => [course as CourseType, ...prev]);
+            toast({
+              title: "Course Generated Successfully",
+              description: "Your course is now ready to view!",
+            });
+            navigate(`/course/${course.id}`);
           }
-        }
-      });
-
-      if (generationError || !generatedData || !generatedData.data) {
-        console.error("Generation error:", generationError || "Failed to generate course content");
-        throw new Error("Failed to generate course content");
-      }
-      
-      console.log("Course generation successful:", generatedData);
-      
-      let summary = "An AI-generated course on " + courseName;
-      let content = null;
-      
-      try {
-        const text = generatedData.data.candidates[0].content.parts[0].text;
-        const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
-        
-        if (summaryMatch && summaryMatch[1]) {
-          summary = summaryMatch[1].trim().substring(0, 500);
-        }
-        
-        content = {
-          fullText: text,
-          generatedAt: new Date().toISOString()
-        };
-      } catch (e) {
-        console.error("Error extracting summary:", e);
-      }
-      
-      const { data: course, error: courseError } = await supabase
-        .from('courses')
-        .insert({
-          title: courseName,
-          purpose,
-          difficulty,
-          content,
-          user_id: user.id
         })
-        .select()
-        .single();
+        .catch((error) => {
+          clearTimeout(timeoutId);
+          console.error("Error creating course:", error);
+          if (isMounted.current) {
+            toast({
+              title: "Error",
+              description: "Failed to create course. Please try again.",
+              variant: "destructive",
+            });
+          }
+        })
+        .finally(() => {
+          if (isMounted.current) {
+            setIsGeneratingCourse(false);
+          }
+        });
       
-      if (courseError) throw courseError;
-      
-      setRecentCourses(prev => [course as CourseType, ...prev]);
-      
-      toast({
-        title: "Course Generated Successfully",
-        description: "Your course is now ready to view!",
-      });
-      
-      navigate(`/course/${course.id}`);
     } catch (error) {
-      console.error("Error creating course:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create course. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingCourse(false);
+      console.error("Error initiating course generation:", error);
+      if (isMounted.current) {
+        toast({
+          title: "Error",
+          description: "Failed to initiate course generation. Please try again.",
+          variant: "destructive",
+        });
+        setIsGeneratingCourse(false);
+      }
     }
+  };
+
+  const generateCourse = async (
+    courseName: string, 
+    purpose: CourseType['purpose'], 
+    difficulty: CourseType['difficulty'],
+    userId: string
+  ): Promise<any> => {
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .insert({
+        title: courseName,
+        purpose,
+        difficulty,
+        content: { status: 'generating' },
+        user_id: userId
+      })
+      .select()
+      .single();
+    
+    if (courseError) throw courseError;
+    
+    const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
+      body: {
+        action: 'generate_course',
+        data: {
+          topic: courseName,
+          purpose,
+          difficulty
+        }
+      }
+    });
+
+    if (generationError || !generatedData || !generatedData.data) {
+      console.error("Generation error:", generationError || "Failed to generate course content");
+      await supabase
+        .from('courses')
+        .update({
+          content: { status: 'error', message: 'Failed to generate course content' }
+        })
+        .eq('id', course.id);
+        
+      throw new Error("Failed to generate course content");
+    }
+    
+    console.log("Course generation successful:", generatedData);
+    
+    let summary = "An AI-generated course on " + courseName;
+    let content = null;
+    
+    try {
+      const text = generatedData.data.candidates[0].content.parts[0].text;
+      const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
+      
+      if (summaryMatch && summaryMatch[1]) {
+        summary = summaryMatch[1].trim().substring(0, 500);
+      }
+      
+      content = {
+        status: 'complete',
+        fullText: text,
+        generatedAt: new Date().toISOString()
+      };
+      
+      await supabase
+        .from('courses')
+        .update({
+          summary,
+          content
+        })
+        .eq('id', course.id);
+      
+    } catch (e) {
+      console.error("Error extracting summary or updating course:", e);
+      await supabase
+        .from('courses')
+        .update({
+          content: { status: 'error', message: 'Error processing generated content' }
+        })
+        .eq('id', course.id);
+        
+      throw e;
+    }
+    
+    return course;
   };
 
   const startRecording = () => {
@@ -379,10 +484,12 @@ const MockInterview = () => {
   };
 
   const handleDownloadInterview = () => {
-    toast({
-      title: "Interview Downloaded",
-      description: "Your interview has been downloaded successfully.",
-    });
+    if (isMounted.current) {
+      toast({
+        title: "Interview Downloaded",
+        description: "Your interview has been downloaded successfully.",
+      });
+    }
   };
 
   const renderStage = () => {
@@ -759,3 +866,4 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
+
