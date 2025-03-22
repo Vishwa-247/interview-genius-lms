@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,13 +9,59 @@ import CourseForm from "@/components/course/CourseForm";
 import { useAuth } from "@/context/AuthContext";
 import { CourseType } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { toast as sonnerToast } from "sonner";
 
 const CourseGenerator = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [generationInBackground, setGenerationInBackground] = useState(false);
   const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
+  const [courseGenerationId, setCourseGenerationId] = useState<string | null>(null);
+
+  // Effect to check background generation status
+  useEffect(() => {
+    let intervalId: number | null = null;
+    
+    if (generationInBackground && courseGenerationId) {
+      // Poll for course generation completion every 5 seconds
+      intervalId = window.setInterval(async () => {
+        try {
+          const { data: course, error } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('id', courseGenerationId)
+            .single();
+          
+          if (error) throw error;
+          
+          // Check if content has been generated
+          if (course && course.content) {
+            // Clear the interval
+            if (intervalId) clearInterval(intervalId);
+            setGenerationInBackground(false);
+            setCourseGenerationId(null);
+            
+            // Notify the user that generation is complete
+            sonnerToast.success('Course Generation Complete', {
+              description: `Your course "${course.title}" has been generated successfully.`,
+              action: {
+                label: 'View Course',
+                onClick: () => navigate(`/course/${course.id}`),
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Error checking course generation status:", error);
+        }
+      }, 5000);
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [generationInBackground, courseGenerationId, navigate]);
 
   const handleSubmit = async (courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
     if (!user) {
@@ -31,22 +77,70 @@ const CourseGenerator = () => {
     
     try {
       toast({
-        title: "Generating Course",
-        description: "Please wait while we create your course. This may take a minute.",
+        title: "Starting Course Generation",
+        description: "This process will continue in the background. You can navigate to other pages.",
       });
 
       console.log("Starting course generation for:", courseName);
       
-      // Create a timeout promise rather than using AbortController signal
-      const timeoutPromise = new Promise((_, reject) => {
-        const id = setTimeout(() => {
-          clearTimeout(id);
-          reject(new Error("Course generation timed out after 2 minutes. Please try again."));
-        }, 120000); // 2 minute timeout
+      // First create an empty course record to track generation
+      const { data: emptyCourse, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          title: courseName,
+          purpose,
+          difficulty,
+          user_id: user.id,
+          summary: "Course generation in progress...",
+          content: null
+        })
+        .select()
+        .single();
+      
+      if (courseError) {
+        throw courseError;
+      }
+      
+      // Store the course ID for background status checking
+      setCourseGenerationId(emptyCourse.id);
+      
+      // Set background generation flag
+      setGenerationInBackground(true);
+      
+      // Start the API call in the background and don't wait for it
+      generateCourseInBackground(emptyCourse.id, courseName, purpose, difficulty);
+      
+      // Add the empty course to recent courses
+      setRecentCourses(prev => [emptyCourse as CourseType, ...prev]);
+      
+      // Allow the user to navigate away
+      sonnerToast.info('Course Generation Started', {
+        description: 'Your course is being generated in the background. You can continue browsing the site.',
+        duration: 5000,
       });
       
-      // The actual API call promise
-      const apiPromise = supabase.functions.invoke('gemini-api', {
+      // Navigate to dashboard to show all courses including the in-progress one
+      navigate('/dashboard');
+      
+    } catch (error: any) {
+      console.error("Error starting course generation:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start course generation. Please try again later.",
+        variant: "destructive",
+      });
+      setGenerationInBackground(false);
+      setCourseGenerationId(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to handle background course generation
+  const generateCourseInBackground = async (courseId: string, courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
+    try {
+      // The actual API call
+      const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
         body: {
           action: 'generate_course',
           data: {
@@ -56,18 +150,20 @@ const CourseGenerator = () => {
           }
         }
       });
-      
-      // Race between timeout and API call
-      const { data: generatedData, error: generationError } = await Promise.race([
-        apiPromise,
-        timeoutPromise.then(() => {
-          throw new Error("Course generation timed out after 2 minutes. Please try again.");
-        })
-      ]) as Awaited<typeof apiPromise>;
 
       if (generationError || !generatedData || !generatedData.data) {
         console.error("Generation error:", generationError || "Failed to generate course content");
-        throw new Error(generationError?.message || "Failed to generate course content");
+        
+        // Update the course with error status
+        await supabase
+          .from('courses')
+          .update({
+            summary: "Error generating course. Please try again.",
+            content: { error: true }
+          })
+          .eq('id', courseId);
+          
+        return;
       }
       
       console.log("Course generation successful, processing response...");
@@ -94,48 +190,33 @@ const CourseGenerator = () => {
         console.log("Content processed successfully, saving to database...");
       } catch (e) {
         console.error("Error extracting content:", e);
+        content = { error: "Failed to parse content" };
       }
       
-      // Create course in database
-      const { data: course, error: courseError } = await supabase
+      // Update course in database with the generated content
+      const { error: updateError } = await supabase
         .from('courses')
-        .insert({
-          title: courseName,
-          purpose,
-          difficulty,
-          content,
-          user_id: user.id
+        .update({
+          summary,
+          content
         })
-        .select()
-        .single();
+        .eq('id', courseId);
       
-      if (courseError) {
-        console.error("Error saving course to database:", courseError);
-        throw courseError;
+      if (updateError) {
+        console.error("Error updating course with generated content:", updateError);
       }
-      
-      console.log("Course saved to database:", course);
-      
-      // Update recent courses list with type assertion
-      setRecentCourses(prev => [course as CourseType, ...prev]);
-      
-      toast({
-        title: "Course Created!",
-        description: "Your course has been generated successfully.",
-      });
-      
-      // Navigate to the course detail page
-      navigate(`/course/${course.id}`);
       
     } catch (error: any) {
-      console.error("Error generating course:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate course. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      console.error("Background generation error:", error);
+      
+      // Update the course with error status
+      await supabase
+        .from('courses')
+        .update({
+          summary: "Error generating course: " + (error.message || "Unknown error"),
+          content: { error: true }
+        })
+        .eq('id', courseId);
     }
   };
 
@@ -270,6 +351,18 @@ const CourseGenerator = () => {
                   <span>Start learning at your own pace with your personalized course</span>
                 </li>
               </ol>
+              
+              {generationInBackground && (
+                <div className="mt-6 p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <p className="text-sm font-medium">Course generation in progress</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can navigate to other pages. We'll notify you when it's ready.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -279,9 +372,9 @@ const CourseGenerator = () => {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-card p-8 rounded-lg shadow-lg max-w-md w-full text-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin mx-auto" />
-            <h3 className="text-xl font-semibold">Generating Your Course</h3>
+            <h3 className="text-xl font-semibold">Starting Course Generation</h3>
             <p className="text-muted-foreground">
-              Please wait while our AI creates your personalized course. This may take a minute or two.
+              We're preparing your course. Once started, you can navigate away and we'll notify you when it's ready.
             </p>
           </div>
         </div>

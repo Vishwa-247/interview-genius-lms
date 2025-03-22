@@ -1,13 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CourseType, ChapterType, FlashcardType, McqType, QnaType, MockInterviewType, InterviewQuestionType, InterviewAnalysisType } from '@/types';
 
-// More aggressive type assertion helper to work around typing issues with empty Database definition
 const fromTable = <T>(tableName: string) => {
-  // Using any type assertion to completely bypass TypeScript's type checking
   return (supabase as any).from(tableName);
 };
 
-// Course APIs
 export const createCourse = async (
   title: string,
   purpose: CourseType['purpose'],
@@ -53,7 +50,6 @@ export const getAllCourses = async (userId: string): Promise<CourseType[]> => {
   return data as CourseType[] || [];
 };
 
-// Added function for Dashboard.tsx
 export const getUserCourses = async (): Promise<CourseType[]> => {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
@@ -61,7 +57,17 @@ export const getUserCourses = async (): Promise<CourseType[]> => {
   return getAllCourses(userData.user.id);
 };
 
-// Chapter APIs
+export const checkCourseGenerationStatus = async (courseId: string): Promise<boolean> => {
+  const { data, error } = await fromTable<CourseType>('courses')
+    .select('content')
+    .eq('id', courseId)
+    .single();
+    
+  if (error) throw error;
+  
+  return !!(data?.content && typeof data.content === 'object' && !('error' in data.content));
+};
+
 export const createChapters = async (
   courseId: string,
   chapters: { title: string; content: string; order_number: number }[]
@@ -89,7 +95,6 @@ export const getChaptersByCourseId = async (courseId: string): Promise<ChapterTy
   return data as ChapterType[];
 };
 
-// Flashcard APIs
 export const createFlashcards = async (
   courseId: string,
   flashcards: { question: string; answer: string }[]
@@ -116,7 +121,6 @@ export const getFlashcardsByCourseId = async (courseId: string): Promise<Flashca
   return data as FlashcardType[];
 };
 
-// MCQ APIs
 export const createMcqs = async (
   courseId: string,
   mcqs: { question: string; options: string[]; correct_answer: string }[]
@@ -143,11 +147,9 @@ export const getMcqsByCourseId = async (courseId: string): Promise<McqType[]> =>
 
   if (error) throw error;
   
-  // Process the options back from JSON if needed
   return data as McqType[];
 };
 
-// Q&A APIs
 export const createQnas = async (
   courseId: string,
   qnas: { question: string; answer: string }[]
@@ -174,7 +176,6 @@ export const getQnasByCourseId = async (courseId: string): Promise<QnaType[]> =>
   return data as QnaType[];
 };
 
-// Mock Interview APIs
 export const createMockInterview = async (
   jobRole: string,
   techStack: string,
@@ -198,7 +199,6 @@ export const createMockInterview = async (
   return data as MockInterviewType;
 };
 
-// Added function for Dashboard.tsx
 export const getUserMockInterviews = async (): Promise<MockInterviewType[]> => {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
@@ -235,7 +235,6 @@ export const updateMockInterviewCompleted = async (interviewId: string): Promise
   if (error) throw error;
 };
 
-// Interview Questions APIs
 export const createInterviewQuestions = async (
   interviewId: string,
   questions: {
@@ -278,7 +277,6 @@ export const updateInterviewQuestionAnswer = async (questionId: string, answer: 
   if (error) throw error;
 };
 
-// Interview Analysis APIs
 export const createInterviewAnalysis = async (
   interviewId: string,
   facialExpressionData: {
@@ -323,7 +321,6 @@ export const getInterviewAnalysisByInterviewId = async (interviewId: string): Pr
   return data as InterviewAnalysisType;
 };
 
-// Speech Analysis API - Added for communication skills analysis
 export const analyzeSpeech = async (
   audioBlob: Blob,
   jobRole: string
@@ -335,10 +332,8 @@ export const analyzeSpeech = async (
   grammar: number;
   feedback: string;
 }> => {
-  // This will later integrate with the Flask API
-  // For now, return mock data
   return {
-    clarity: Math.random() * 60 + 40, // 40-100
+    clarity: Math.random() * 60 + 40,
     confidence: Math.random() * 60 + 40,
     fluency: Math.random() * 60 + 40,
     accent: Math.random() * 60 + 40,
@@ -347,7 +342,6 @@ export const analyzeSpeech = async (
   };
 };
 
-// Future API endpoint for facial expression analysis that will connect to Flask
 export const analyzeFacialExpression = async (
   imageBlob: Blob
 ): Promise<{
@@ -357,18 +351,15 @@ export const analyzeFacialExpression = async (
   nervous: number;
   excited: number;
 }> => {
-  // This will later integrate with the Flask API
-  // For now, return mock data
   return {
-    confident: Math.random() * 0.7 + 0.3, // Between 0.3 and 1.0
-    stressed: Math.random() * 0.5,        // Between 0 and 0.5
-    hesitant: Math.random() * 0.6,        // Between 0 and 0.6
-    nervous: Math.random() * 0.4,         // Between 0 and 0.4
-    excited: Math.random() * 0.5 + 0.2    // Between 0.2 and 0.7
+    confident: Math.random() * 0.7 + 0.3,
+    stressed: Math.random() * 0.5,
+    hesitant: Math.random() * 0.6,
+    nervous: Math.random() * 0.4,
+    excited: Math.random() * 0.5 + 0.2
   };
 };
 
-// Gemini API integration
 export const generateCourseWithGemini = async (
   topic: string,
   purpose: CourseType['purpose'],
@@ -389,7 +380,6 @@ export const generateCourseWithGemini = async (
   return data;
 };
 
-// Function for CourseGenerator.tsx to replace missing generateCourseContent
 export const generateCourseContent = async (
   topic: string, 
   purpose: CourseType['purpose'], 
@@ -440,14 +430,13 @@ export const analyzeInterviewResponse = async (
   return data;
 };
 
-// Study Material APIs
 export interface StudyMaterial {
   id?: number;
   course_id: string;
   course_type: string;
   topic: string;
   difficulty_level?: string;
-  course_layout?: any; // JSONB data
+  course_layout?: any;
   created_by: string;
   status?: string;
   created_at?: string;
@@ -504,7 +493,6 @@ export const updateStudyMaterialLayout = async (id: number, courseLayout: any): 
   if (error) throw error;
 };
 
-// User APIs
 export interface UserProfile {
   id: string;
   name: string;
@@ -544,3 +532,4 @@ export const updateMembershipStatus = async (userId: string, isMember: boolean):
 
   if (error) throw error;
 };
+
