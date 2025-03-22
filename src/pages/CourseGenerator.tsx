@@ -37,11 +37,16 @@ const CourseGenerator = () => {
 
       console.log("Starting course generation for:", courseName);
       
-      // Call the Gemini API through our Supabase Edge Function with timeout handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      // Create a timeout promise rather than using AbortController signal
+      const timeoutPromise = new Promise((_, reject) => {
+        const id = setTimeout(() => {
+          clearTimeout(id);
+          reject(new Error("Course generation timed out after 2 minutes. Please try again."));
+        }, 120000); // 2 minute timeout
+      });
       
-      const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
+      // The actual API call promise
+      const apiPromise = supabase.functions.invoke('gemini-api', {
         body: {
           action: 'generate_course',
           data: {
@@ -49,11 +54,16 @@ const CourseGenerator = () => {
             purpose,
             difficulty
           }
-        },
-        signal: controller.signal,
+        }
       });
       
-      clearTimeout(timeoutId);
+      // Race between timeout and API call
+      const { data: generatedData, error: generationError } = await Promise.race([
+        apiPromise,
+        timeoutPromise.then(() => {
+          throw new Error("Course generation timed out after 2 minutes. Please try again.");
+        })
+      ]) as Awaited<typeof apiPromise>;
 
       if (generationError || !generatedData || !generatedData.data) {
         console.error("Generation error:", generationError || "Failed to generate course content");
