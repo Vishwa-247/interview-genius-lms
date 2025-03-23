@@ -22,10 +22,10 @@ const CourseForm = ({ onSubmit, isLoading }: CourseFormProps) => {
   };
 
   const purposeOptions = [
-    { value: "exam" as const, label: "Exam Preparation" },
-    { value: "job_interview" as const, label: "Job Interview" },
+    { value: "exam" as const, label: "Exam" },
+    { value: "job_interview" as const, label: "Interview" },
     { value: "practice" as const, label: "Practice" },
-    { value: "coding_preparation" as const, label: "Coding Preparation" },
+    { value: "coding_preparation" as const, label: "Coding" },
     { value: "other" as const, label: "Other" },
   ];
 
@@ -37,22 +37,22 @@ const CourseForm = ({ onSubmit, isLoading }: CourseFormProps) => {
   ];
 
   return (
-    <GlassMorphism className="p-8 max-w-2xl mx-auto" intensity="medium">
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <GlassMorphism className="p-6 max-w-2xl mx-auto" intensity="medium">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <label
             htmlFor="courseName"
             className="block text-sm font-medium text-foreground"
           >
-            Course Topic or Subject
+            Course Topic
           </label>
           <input
             id="courseName"
             type="text"
             value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
-            placeholder="e.g., React Fundamentals, Data Structures, Machine Learning..."
-            className="w-full px-4 py-3 bg-white/20 dark:bg-black/20 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground/70 text-foreground"
+            placeholder="Enter a topic to learn"
+            className="w-full px-4 py-2 bg-white/20 dark:bg-black/20 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
             required
           />
         </div>
@@ -62,15 +62,15 @@ const CourseForm = ({ onSubmit, isLoading }: CourseFormProps) => {
             htmlFor="purpose"
             className="block text-sm font-medium text-foreground"
           >
-            Course Purpose
+            Purpose
           </label>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-5 gap-2">
             {purposeOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => setPurpose(option.value)}
-                className={`px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                   purpose === option.value
                     ? "bg-primary text-white"
                     : "bg-white/20 dark:bg-black/20 text-foreground hover:bg-white/30 dark:hover:bg-black/30"
@@ -87,15 +87,15 @@ const CourseForm = ({ onSubmit, isLoading }: CourseFormProps) => {
             htmlFor="difficulty"
             className="block text-sm font-medium text-foreground"
           >
-            Difficulty Level
+            Level
           </label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             {difficultyOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => setDifficulty(option.value)}
-                className={`px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                   difficulty === option.value
                     ? "bg-primary text-white"
                     : "bg-white/20 dark:bg-black/20 text-foreground hover:bg-white/30 dark:hover:bg-black/30"
@@ -110,7 +110,7 @@ const CourseForm = ({ onSubmit, isLoading }: CourseFormProps) => {
         <button
           type="submit"
           disabled={isLoading || !courseName.trim()}
-          className={`w-full px-6 py-3 flex items-center justify-center text-white font-medium bg-primary rounded-lg transition-all ${
+          className={`w-full px-4 py-2 flex items-center justify-center text-white font-medium bg-primary rounded-lg transition-all ${
             isLoading || !courseName.trim()
               ? "opacity-70 cursor-not-allowed"
               : "hover:bg-primary/90"
@@ -118,8 +118,8 @@ const CourseForm = ({ onSubmit, isLoading }: CourseFormProps) => {
         >
           {isLoading ? (
             <>
-              <Loader2 size={20} className="mr-2 animate-spin" />
-              Generating Course...
+              <Loader2 size={16} className="mr-2 animate-spin" />
+              Processing...
             </>
           ) : (
             "Generate Course"

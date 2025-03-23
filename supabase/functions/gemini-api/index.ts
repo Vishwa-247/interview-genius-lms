@@ -1,4 +1,6 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +15,7 @@ serve(async (req) => {
 
   try {
     console.log("Edge function invoked");
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || "AIzaSyBgMvHfIYb06Bn3oBi8Y-ykFR7J_n5zx18";
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY is not set in environment variables');
@@ -24,7 +26,6 @@ serve(async (req) => {
 
     let endpoint = '';
     let requestBody = {};
-    let responseHandler;
 
     switch (action) {
       case 'generate_course':
@@ -141,57 +142,6 @@ serve(async (req) => {
         };
         break;
 
-      case 'analyze_speech':
-        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-        requestBody = {
-          contents: [{
-            parts: [{
-              text: `Analyze this speech transcript for a ${data.jobRole} interview:
-                    
-                     "${data.transcript}"
-                     
-                     Evaluate the speaking skills in terms of:
-                     1. Clarity (how clear and understandable the speech is)
-                     2. Confidence (how confident the speaker sounds)
-                     3. Fluency (how smoothly the speech flows)
-                     4. Grammar and vocabulary (correctness and richness of language)
-                     5. Technical accuracy (correct use of technical terms)
-                     
-                     Provide a rating for each category (0-100) and specific feedback on how to improve.`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 2048,
-          }
-        };
-        break;
-
-      case 'analyze_facial_expression':
-        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-        requestBody = {
-          contents: [{
-            parts: [{
-              text: `Analyze this description of facial expressions during an interview:
-                     
-                     ${data.facialData}
-                     
-                     Provide feedback on:
-                     1. Overall impression (how the candidate appears to interviewers)
-                     2. Confidence signals (what expressions indicate confidence or lack thereof)
-                     3. Engagement level (how engaged the person appears to be)
-                     4. Improvement suggestions (specific tips to improve facial expressions)
-                     
-                     Include specific techniques the candidate can practice to improve their non-verbal communication.`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 2048,
-          }
-        };
-        break;
-
       default:
         throw new Error(`Unsupported action: ${action}`);
     }
@@ -200,7 +150,7 @@ serve(async (req) => {
     
     // Set a timeout for the API call
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout
     
     try {
       const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
@@ -324,7 +274,7 @@ async function processBackgroundCourseGeneration(
           status: 'complete',
           fullText: text,
           generatedAt: new Date().toISOString(),
-          parsedContent: text
+          parsedContent: parseGeneratedContent(text)
         } 
       })
       .eq('id', courseId);
@@ -357,5 +307,97 @@ async function processBackgroundCourseGeneration(
   }
 }
 
-// Import createClient for Supabase admin operations in background processing
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+// Helper function to parse the generated content
+function parseGeneratedContent(text) {
+  const parsedContent = {
+    summary: "",
+    chapters: [],
+    flashcards: [],
+    mcqs: [],
+    qnas: []
+  };
+
+  // Extract summary
+  const summaryMatch = text.match(/# SUMMARY\s*\n([\s\S]*?)(?=\n# |\n## |$)/i);
+  if (summaryMatch && summaryMatch[1]) {
+    parsedContent.summary = summaryMatch[1].trim();
+  }
+
+  // Extract chapters
+  const chaptersSection = text.match(/# CHAPTERS\s*\n([\s\S]*?)(?=\n# |$)/i);
+  if (chaptersSection && chaptersSection[1]) {
+    const chaptersText = chaptersSection[1];
+    const chapterBlocks = chaptersText.split(/\n(?=## )/g);
+    
+    parsedContent.chapters = chapterBlocks.map((block, index) => {
+      const titleMatch = block.match(/## (.*)/);
+      const title = titleMatch ? titleMatch[1].trim() : `Chapter ${index + 1}`;
+      const content = block.replace(/## .*\n/, '').trim();
+      
+      return {
+        title,
+        content,
+        order_number: index + 1
+      };
+    });
+  }
+
+  // Extract flashcards
+  const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
+  if (flashcardsSection && flashcardsSection[1]) {
+    const flashcardsText = flashcardsSection[1];
+    const flashcardMatches = [...flashcardsText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+    
+    parsedContent.flashcards = flashcardMatches.map((match) => ({
+      question: match[1].trim(),
+      answer: match[2].trim()
+    }));
+  }
+
+  // Extract MCQs
+  const mcqsSection = text.match(/# MCQs[\s\S]*?(?:Multiple Choice Questions\)?)?\s*\n([\s\S]*?)(?=\n# |$)/i);
+  if (mcqsSection && mcqsSection[1]) {
+    const mcqsText = mcqsSection[1];
+    const mcqBlocks = mcqsText.split(/\n(?=- Question: )/g);
+    
+    parsedContent.mcqs = mcqBlocks.filter(block => block.includes('- Question:')).map(block => {
+      const questionMatch = block.match(/- Question: ([\s\S]*?)(?=\n- Options:|\n|$)/);
+      const optionsText = block.match(/- Options:\s*\n([\s\S]*?)(?=\n- Correct Answer:|\n|$)/);
+      const correctAnswerMatch = block.match(/- Correct Answer: ([a-d])/i);
+      
+      const question = questionMatch ? questionMatch[1].trim() : '';
+      
+      let options = [];
+      if (optionsText && optionsText[1]) {
+        options = optionsText[1]
+          .split(/\n\s*/)
+          .filter(line => /^[a-d]\)/.test(line))
+          .map(line => line.replace(/^[a-d]\)\s*/, '').trim());
+      }
+      
+      const correctAnswer = correctAnswerMatch ? 
+        options[correctAnswerMatch[1].charCodeAt(0) - 'a'.charCodeAt(0)] : 
+        '';
+      
+      return {
+        question,
+        options,
+        correct_answer: correctAnswer
+      };
+    });
+  }
+
+  // Extract Q&As
+  const qnasSection = text.match(/# Q&A PAIRS\s*\n([\s\S]*?)(?=\n# |$)/i);
+  if (qnasSection && qnasSection[1]) {
+    const qnasText = qnasSection[1];
+    const qnaMatches = [...qnasText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+    
+    parsedContent.qnas = qnaMatches.map((match) => ({
+      question: match[1].trim(),
+      answer: match[2].trim()
+    }));
+  }
+
+  return parsedContent;
+}

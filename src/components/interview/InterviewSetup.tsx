@@ -30,24 +30,24 @@ const InterviewSetup = ({ onSubmit, isLoading = false }: InterviewSetupProps) =>
   const popularRoles = [
     "Software Engineer",
     "Data Scientist",
-    "Product Manager",
-    "UX Designer",
-    "DevOps Engineer",
     "Frontend Developer",
+    "Backend Developer",
+    "DevOps Engineer",
+    "ML Engineer",
   ];
 
   const popularTechStacks = [
-    "React, Node.js, MongoDB",
-    "Python, TensorFlow, PyTorch",
-    "Java, Spring Boot, MySQL",
-    "Swift, iOS, Firebase",
-    "Flutter, Dart, Firebase",
-    "PHP, Laravel, MySQL",
+    "React, Node.js",
+    "Python, TensorFlow",
+    "Java, Spring",
+    "JavaScript, React",
+    "Python, Django",
+    "Go, Docker",
   ];
 
   return (
-    <GlassMorphism className="p-8 max-w-2xl mx-auto" intensity="medium">
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <GlassMorphism className="p-6 max-w-2xl mx-auto" intensity="medium">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <label
             htmlFor="role"
@@ -61,8 +61,8 @@ const InterviewSetup = ({ onSubmit, isLoading = false }: InterviewSetupProps) =>
             type="text"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            placeholder="e.g., Software Engineer, Data Scientist, Product Manager..."
-            className="w-full px-4 py-3 bg-white/20 dark:bg-black/20 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground/70 text-foreground"
+            placeholder="e.g., Software Engineer"
+            className="w-full px-4 py-2 bg-white/20 dark:bg-black/20 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
             required
           />
           <div className="pt-2 flex flex-wrap gap-2">
@@ -85,15 +85,15 @@ const InterviewSetup = ({ onSubmit, isLoading = false }: InterviewSetupProps) =>
             className="block text-sm font-medium text-foreground flex items-center gap-2"
           >
             <Code size={16} />
-            Tech Stack / Skills
+            Tech Stack
           </label>
           <input
             id="techStack"
             type="text"
             value={techStack}
             onChange={(e) => setTechStack(e.target.value)}
-            placeholder="e.g., React, Python, AWS, SQL, Machine Learning..."
-            className="w-full px-4 py-3 bg-white/20 dark:bg-black/20 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground/70 text-foreground"
+            placeholder="e.g., React, Python"
+            className="w-full px-4 py-2 bg-white/20 dark:bg-black/20 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
             required
           />
           <div className="pt-2 flex flex-wrap gap-2">
@@ -116,15 +116,15 @@ const InterviewSetup = ({ onSubmit, isLoading = false }: InterviewSetupProps) =>
             className="block text-sm font-medium text-foreground flex items-center gap-2"
           >
             <Clock size={16} />
-            Years of Experience
+            Experience
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             {experienceOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => setExperience(option.value)}
-                className={`px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                   experience === option.value
                     ? "bg-primary text-white"
                     : "bg-white/20 dark:bg-black/20 text-foreground hover:bg-white/30 dark:hover:bg-black/30"
@@ -139,13 +139,13 @@ const InterviewSetup = ({ onSubmit, isLoading = false }: InterviewSetupProps) =>
         <button
           type="submit"
           disabled={isLoading || !role.trim() || !techStack.trim()}
-          className={`w-full px-6 py-3 text-white font-medium bg-primary rounded-lg transition-all ${
+          className={`w-full px-4 py-2 text-white font-medium bg-primary rounded-lg transition-all ${
             !role.trim() || !techStack.trim() || isLoading
               ? "opacity-70 cursor-not-allowed"
               : "hover:bg-primary/90"
           }`}
         >
-          {isLoading ? "Setting Up Interview..." : "Start Mock Interview"}
+          {isLoading ? "Setting Up..." : "Start Interview"}
         </button>
       </form>
     </GlassMorphism>
