@@ -1,57 +1,136 @@
-# Welcome to project
 
+# StudyMate - AI Learning and Interview Practice Platform
 
+StudyMate is an AI-powered platform for personalized learning and interview practice. Generate custom study materials and practice job interviews with AI feedback.
 
+## Technologies Used
 
-## How can I edit this code?
+This project is built with:
 
-There are several ways of editing your application.
+- **Frontend**:
+  - Vite - Fast build tool and development server
+  - React - UI library
+  - TypeScript - For type safety
+  - Tailwind CSS - Utility-first CSS framework
+  - shadcn/ui - High-quality UI components
+  - React Router - For navigation
+  - Tanstack React Query - For data fetching and state management
 
+- **Backend**:
+  - Supabase - Backend as a service for:
+    - PostgreSQL Database - Storing user data, courses, and interview records
+    - Authentication - User management
+    - Edge Functions - For AI integrations with Google's Gemini API
 
+## Prerequisites
 
-**Use your preferred IDE**
+Before you start, make sure you have the following installed:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. 
+- [Node.js](https://nodejs.org/) (v18 or newer)
+- [npm](https://www.npmjs.com/) (included with Node.js)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Installation and Setup
 
-Follow these steps:
+1. **Clone the repository**
+   ```sh
+   git clone <your-repository-url>
+   cd studymate
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. **Install dependencies**
+   ```sh
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. **Set up Supabase**
+   
+   This project uses Supabase for backend services. You'll need to:
+   
+   1. Create a Supabase account and project at [supabase.com](https://supabase.com)
+   2. Get your Supabase URL and anon key from your project dashboard
+   3. Set up the same database schema as used in this project (tables for users, courses, chapters, mock interviews, etc.)
+   4. (Optional) Set up OAuth providers if you want social login
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. **Set up Gemini API**
+   
+   For AI features, you need a Google Gemini API key:
+   
+   1. Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   2. Add your Gemini API key to Supabase edge function secrets
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## Running the Application
 
-**Edit a file directly in GitHub**
+1. **Start the development server**
+   ```sh
+   npm run dev
+   ```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+2. **Access the application**
+   
+   Open your browser and navigate to `http://localhost:8080`
 
-**Use GitHub Codespaces**
+## Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The application is configured for easy deployment to various platforms:
 
-## What technologies are used for this project?
+- **Vercel/Netlify**: Connect your repository and they will automatically build and deploy your application
+- **Self-hosted**: Build the application with `npm run build` and serve the `dist` directory with a web server
 
-This project is built with .
+## Project Structure
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- `/src` - Source code
+  - `/components` - React components
+  - `/context` - Context providers
+  - `/hooks` - Custom React hooks
+  - `/integrations` - Integration with external services (Supabase)
+  - `/lib` - Utility functions
+  - `/pages` - Page components
+  - `/services` - API service functions
+  - `/types` - TypeScript type definitions
 
+## Key Features
+
+- **Course Generation**: AI-powered course creation based on your learning goals
+- **Mock Interviews**: Practice interviews with AI feedback
+- **Personalized Dashboard**: Track your learning progress
+- **Interactive Learning**: Multi-format learning materials
+
+## Supabase Configuration
+
+This project uses the following Supabase features:
+
+1. **Authentication**: Email/password authentication
+2. **Database**: Storing user profiles, courses, and interview data
+3. **Edge Functions**: For AI integrations (Gemini API)
+
+### Required Database Tables:
+
+- `users` - Storing user profiles
+- `courses` - For storing course information
+- `chapters` - For storing course chapters
+- `flashcards` - For storing learning flashcards
+- `mcqs` - For storing multiple choice questions
+- `qna` - For storing Q&A pairs
+- `mock_interviews` - For storing interview sessions
+- `interview_questions` - For storing interview questions
+- `interview_analysis` - For storing interview feedback
+
+### Edge Functions:
+
+- `gemini-api` - Handle interactions with Google's Gemini API for course generation and interview analysis
+
+## Environment Variables
+
+The project uses Supabase environment variables that are configured in the Supabase dashboard:
+
+- `GEMINI_API_KEY` - Your Google Gemini API key (set in Supabase Edge Function secrets)
+
+## Troubleshooting
+
+- **API Key Issues**: Ensure your Gemini API key is correctly set in Supabase Edge Function secrets
+- **Database Errors**: Check that your Supabase database schema matches the required structure
+- **Authentication Problems**: Verify your Supabase authentication settings
+
+## License
+
+[MIT License](LICENSE)

@@ -8,7 +8,6 @@ import { ArrowRight, Book, Video, MessageSquare } from "lucide-react";
 import Container from "@/components/ui/Container";
 import { useAuth } from "@/context/AuthContext";
 import Chatbot from "@/components/Chatbot";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
