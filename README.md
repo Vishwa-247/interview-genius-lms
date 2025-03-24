@@ -28,12 +28,14 @@ Before you start, make sure you have the following installed:
 
 - [Node.js](https://nodejs.org/) (v18 or newer)
 - [npm](https://www.npmjs.com/) (included with Node.js)
+- A Supabase account for backend services
+- A Google Gemini API key for AI features
 
 ## Installation and Setup
 
 1. **Clone the repository**
    ```sh
-   git clone <your-repository-url>
+   git clone https://github.com/yourusername/studymate.git
    cd studymate
    ```
 
@@ -48,15 +50,35 @@ Before you start, make sure you have the following installed:
    
    1. Create a Supabase account and project at [supabase.com](https://supabase.com)
    2. Get your Supabase URL and anon key from your project dashboard
-   3. Set up the same database schema as used in this project (tables for users, courses, chapters, mock interviews, etc.)
-   4. (Optional) Set up OAuth providers if you want social login
+   3. Create the following tables in your Supabase database:
+      - `courses` - For storing course information
+      - `mock_interviews` - For storing interview sessions
+      - `interview_questions` - For storing interview questions
+      - `interview_analysis` - For storing interview feedback
+      - `study_material` - For storing additional study content
+      - `users` - For storing extended user profile data
 
-4. **Set up Gemini API**
+4. **Configure environment variables**
    
-   For AI features, you need a Google Gemini API key:
+   Create a file named `.env.local` in the root directory and add the following:
+
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+5. **Deploy Supabase Edge Functions**
+
+   The project uses Supabase Edge Functions to communicate with Google's Gemini API. You'll need to:
    
-   1. Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-   2. Add your Gemini API key to Supabase edge function secrets
+   1. Install the Supabase CLI: `npm install -g supabase`
+   2. Login to Supabase CLI: `supabase login`
+   3. Link your project: `supabase link --project-ref your-project-ref`
+   4. Deploy the edge functions: `supabase functions deploy gemini-api`
+   5. Add your Gemini API key as a secret to the edge function:
+      ```
+      supabase secrets set GEMINI_API_KEY=your_gemini_api_key
+      ```
 
 ## Running the Application
 
@@ -67,14 +89,7 @@ Before you start, make sure you have the following installed:
 
 2. **Access the application**
    
-   Open your browser and navigate to `http://localhost:8080`
-
-## Deployment
-
-The application is configured for easy deployment to various platforms:
-
-- **Vercel/Netlify**: Connect your repository and they will automatically build and deploy your application
-- **Self-hosted**: Build the application with `npm run build` and serve the `dist` directory with a web server
+   Open your browser and navigate to `http://localhost:5173` (or the port shown in your terminal)
 
 ## Project Structure
 
@@ -87,6 +102,8 @@ The application is configured for easy deployment to various platforms:
   - `/pages` - Page components
   - `/services` - API service functions
   - `/types` - TypeScript type definitions
+- `/supabase` - Supabase configuration and edge functions
+  - `/functions` - Edge function implementations
 
 ## Key Features
 
@@ -97,39 +114,58 @@ The application is configured for easy deployment to various platforms:
 
 ## Supabase Configuration
 
-This project uses the following Supabase features:
+Make sure your Supabase database has the following tables correctly set up:
 
-1. **Authentication**: Email/password authentication
-2. **Database**: Storing user profiles, courses, and interview data
-3. **Edge Functions**: For AI integrations (Gemini API)
+1. **courses**: Store course information
+   - `id` (UUID, primary key)
+   - `user_id` (UUID)
+   - `title` (text)
+   - `purpose` (text)
+   - `difficulty` (text)
+   - `summary` (text)
+   - `content` (JSON)
+   - `created_at` (timestamp)
 
-### Required Database Tables:
+2. **mock_interviews**: Store interview sessions
+   - `id` (UUID, primary key)
+   - `user_id` (UUID)
+   - `job_role` (text)
+   - `tech_stack` (text)
+   - `experience` (text)
+   - `completed` (boolean)
+   - `created_at` (timestamp)
 
-- `users` - Storing user profiles
-- `courses` - For storing course information
-- `chapters` - For storing course chapters
-- `flashcards` - For storing learning flashcards
-- `mcqs` - For storing multiple choice questions
-- `qna` - For storing Q&A pairs
-- `mock_interviews` - For storing interview sessions
-- `interview_questions` - For storing interview questions
-- `interview_analysis` - For storing interview feedback
+3. **interview_questions**: Store interview questions
+   - `id` (UUID, primary key)
+   - `interview_id` (UUID, foreign key to mock_interviews.id)
+   - `question` (text)
+   - `user_answer` (text, nullable)
+   - `order_number` (integer)
+   - `created_at` (timestamp)
 
-### Edge Functions:
+4. **interview_analysis**: Store interview feedback
+   - `id` (UUID, primary key)
+   - `interview_id` (UUID, foreign key to mock_interviews.id)
+   - `facial_data` (JSON, nullable)
+   - `pronunciation_feedback` (text, nullable)
+   - `technical_feedback` (text, nullable)
+   - `language_feedback` (text, nullable)
+   - `recommendations` (JSON, nullable)
+   - `created_at` (timestamp)
 
-- `gemini-api` - Handle interactions with Google's Gemini API for course generation and interview analysis
+## Gemini API Configuration
 
-## Environment Variables
+This project uses Google's Gemini API for AI features. You'll need to:
 
-The project uses Supabase environment variables that are configured in the Supabase dashboard:
-
-- `GEMINI_API_KEY` - Your Google Gemini API key (set in Supabase Edge Function secrets)
+1. Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Add your Gemini API key to Supabase edge function secrets as described in the setup instructions
 
 ## Troubleshooting
 
 - **API Key Issues**: Ensure your Gemini API key is correctly set in Supabase Edge Function secrets
 - **Database Errors**: Check that your Supabase database schema matches the required structure
-- **Authentication Problems**: Verify your Supabase authentication settings
+- **Authentication Problems**: Verify your Supabase authentication settings are properly configured
+- **Course Generation Errors**: If courses aren't generating, check the Edge Function logs in your Supabase dashboard
 
 ## License
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -20,12 +19,10 @@ const CourseGenerator = () => {
   const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
   const [courseGenerationId, setCourseGenerationId] = useState<string | null>(null);
 
-  // Effect to check background generation status
   useEffect(() => {
     let intervalId: number | null = null;
     
     if (generationInBackground && courseGenerationId) {
-      // Poll for course generation completion every 5 seconds
       intervalId = window.setInterval(async () => {
         try {
           const { data: course, error } = await supabase
@@ -36,14 +33,11 @@ const CourseGenerator = () => {
           
           if (error) throw error;
           
-          // Check if content has been generated
           if (course && course.content) {
-            // Clear the interval
             if (intervalId) clearInterval(intervalId);
             setGenerationInBackground(false);
             setCourseGenerationId(null);
             
-            // Notify the user that generation is complete
             sonnerToast.success('Course Generation Complete', {
               description: `Your course "${course.title}" has been generated successfully.`,
               action: {
@@ -54,6 +48,9 @@ const CourseGenerator = () => {
           }
         } catch (error) {
           console.error("Error checking course generation status:", error);
+          if (intervalId) clearInterval(intervalId);
+          setGenerationInBackground(false);
+          setCourseGenerationId(null);
         }
       }, 5000);
     }
@@ -83,7 +80,6 @@ const CourseGenerator = () => {
 
       console.log("Starting course generation for:", courseName);
       
-      // First create an empty course record to track generation
       const { data: emptyCourse, error: courseError } = await supabase
         .from('courses')
         .insert({
@@ -98,28 +94,23 @@ const CourseGenerator = () => {
         .single();
       
       if (courseError) {
-        throw courseError;
+        console.error("Error creating empty course:", courseError);
+        throw new Error(courseError.message || "Failed to create course");
       }
       
-      // Store the course ID for background status checking
       setCourseGenerationId(emptyCourse.id);
       
-      // Set background generation flag
       setGenerationInBackground(true);
       
-      // Start the API call in the background and don't wait for it
       generateCourseInBackground(emptyCourse.id, courseName, purpose, difficulty);
       
-      // Add the empty course to recent courses
       setRecentCourses(prev => [emptyCourse as CourseType, ...prev]);
       
-      // Allow the user to navigate away
       sonnerToast.info('Course Generation Started', {
         description: 'Your course is being generated in the background. You can continue browsing the site.',
         duration: 5000,
       });
       
-      // Navigate to dashboard to show all courses including the in-progress one
       navigate('/dashboard');
       
     } catch (error: any) {
@@ -136,10 +127,10 @@ const CourseGenerator = () => {
     }
   };
 
-  // Function to handle background course generation
   const generateCourseInBackground = async (courseId: string, courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
     try {
-      // The actual API call
+      console.log("Starting background generation for course ID:", courseId);
+      
       const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
         body: {
           action: 'generate_course',
@@ -151,15 +142,28 @@ const CourseGenerator = () => {
         }
       });
 
-      if (generationError || !generatedData || !generatedData.data) {
-        console.error("Generation error:", generationError || "Failed to generate course content");
+      if (generationError) {
+        console.error("Generation error:", generationError);
         
-        // Update the course with error status
         await supabase
           .from('courses')
           .update({
             summary: "Error generating course. Please try again.",
-            content: { error: true }
+            content: { error: true, message: generationError.message }
+          })
+          .eq('id', courseId);
+          
+        return;
+      }
+      
+      if (!generatedData || !generatedData.data) {
+        console.error("Generation failed: No data returned");
+        
+        await supabase
+          .from('courses')
+          .update({
+            summary: "Error generating course. No content received.",
+            content: { error: true, message: "No content received from API" }
           })
           .eq('id', courseId);
           
@@ -168,20 +172,16 @@ const CourseGenerator = () => {
       
       console.log("Course generation successful, processing response...");
       
-      // Extract summary from the generated content
       let summary = "An AI-generated course on " + courseName;
       let content = null;
       
       try {
         const text = generatedData.data.candidates[0].content.parts[0].text;
         
-        // Parse the full text into structured content
         const parsedContent = parseGeneratedContent(text);
         
-        // Use the parsed summary or fallback
         summary = parsedContent.summary || summary;
         
-        // Store the structured content instead of raw text
         content = {
           parsedContent,
           generatedAt: new Date().toISOString()
@@ -190,10 +190,9 @@ const CourseGenerator = () => {
         console.log("Content processed successfully, saving to database...");
       } catch (e) {
         console.error("Error extracting content:", e);
-        content = { error: "Failed to parse content" };
+        content = { error: "Failed to parse content", message: e instanceof Error ? e.message : String(e) };
       }
       
-      // Update course in database with the generated content
       const { error: updateError } = await supabase
         .from('courses')
         .update({
@@ -209,18 +208,20 @@ const CourseGenerator = () => {
     } catch (error: any) {
       console.error("Background generation error:", error);
       
-      // Update the course with error status
-      await supabase
-        .from('courses')
-        .update({
-          summary: "Error generating course: " + (error.message || "Unknown error"),
-          content: { error: true }
-        })
-        .eq('id', courseId);
+      try {
+        await supabase
+          .from('courses')
+          .update({
+            summary: "Error generating course: " + (error.message || "Unknown error"),
+            content: { error: true, message: error.message || "Unknown error during generation" }
+          })
+          .eq('id', courseId);
+      } catch (updateError) {
+        console.error("Failed to update error status:", updateError);
+      }
     }
   };
 
-  // Helper function to parse the generated content
   const parseGeneratedContent = (text: string) => {
     const parsedContent: any = {
       summary: "",
@@ -230,13 +231,11 @@ const CourseGenerator = () => {
       qnas: []
     };
 
-    // Extract summary
     const summaryMatch = text.match(/# SUMMARY\s*\n([\s\S]*?)(?=\n# |\n## |$)/i);
     if (summaryMatch && summaryMatch[1]) {
       parsedContent.summary = summaryMatch[1].trim();
     }
 
-    // Extract chapters
     const chaptersSection = text.match(/# CHAPTERS\s*\n([\s\S]*?)(?=\n# |$)/i);
     if (chaptersSection && chaptersSection[1]) {
       const chaptersText = chaptersSection[1];
@@ -255,7 +254,6 @@ const CourseGenerator = () => {
       });
     }
 
-    // Extract flashcards
     const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
     if (flashcardsSection && flashcardsSection[1]) {
       const flashcardsText = flashcardsSection[1];
@@ -267,7 +265,6 @@ const CourseGenerator = () => {
       }));
     }
 
-    // Extract MCQs
     const mcqsSection = text.match(/# MCQs[\s\S]*?Multiple Choice Questions\)?\s*\n([\s\S]*?)(?=\n# |$)/i);
     if (mcqsSection && mcqsSection[1]) {
       const mcqsText = mcqsSection[1];
@@ -300,7 +297,6 @@ const CourseGenerator = () => {
       });
     }
 
-    // Extract Q&As
     const qnasSection = text.match(/# Q&A PAIRS\s*\n([\s\S]*?)(?=\n# |$)/i);
     if (qnasSection && qnasSection[1]) {
       const qnasText = qnasSection[1];

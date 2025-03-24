@@ -16,6 +16,7 @@ export type Database = {
           difficulty: string
           id: string
           purpose: string
+          summary: string
           title: string
           user_id: string
         }
@@ -25,6 +26,7 @@ export type Database = {
           difficulty: string
           id?: string
           purpose: string
+          summary: string
           title: string
           user_id: string
         }
@@ -34,6 +36,7 @@ export type Database = {
           difficulty?: string
           id?: string
           purpose?: string
+          summary?: string
           title?: string
           user_id?: string
         }
