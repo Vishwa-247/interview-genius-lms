@@ -12,6 +12,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+// Define an interface for the content structure
+interface CourseContent {
+  status?: string;
+  message?: string;
+  lastUpdated?: string;
+  [key: string]: any;
+}
+
 const CourseGenerator = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -44,28 +52,33 @@ const CourseGenerator = () => {
           
           console.log("Course status check result:", course?.content);
           
-          if (course && course.content && course.content.status === 'complete') {
-            console.log("Course generation completed!");
-            if (intervalId) clearInterval(intervalId);
-            setGenerationInBackground(false);
-            setCourseGenerationId(null);
+          // Type guard to ensure content is an object
+          if (course && course.content && typeof course.content === 'object' && !Array.isArray(course.content)) {
+            const content = course.content as CourseContent;
             
-            sonnerToast.success('Course Generation Complete', {
-              description: `Your course "${course.title}" has been generated successfully.`,
-              action: {
-                label: 'View Course',
-                onClick: () => navigate(`/course/${course.id}`),
-              },
-            });
-          } else if (course && course.content && course.content.status === 'error') {
-            console.error("Course generation failed:", course.content.message);
-            if (intervalId) clearInterval(intervalId);
-            setGenerationInBackground(false);
-            setCourseGenerationId(null);
-            
-            sonnerToast.error('Course Generation Failed', {
-              description: course.content.message || "An unknown error occurred",
-            });
+            if (content.status === 'complete') {
+              console.log("Course generation completed!");
+              if (intervalId) clearInterval(intervalId);
+              setGenerationInBackground(false);
+              setCourseGenerationId(null);
+              
+              sonnerToast.success('Course Generation Complete', {
+                description: `Your course "${course.title}" has been generated successfully.`,
+                action: {
+                  label: 'View Course',
+                  onClick: () => navigate(`/course/${course.id}`),
+                },
+              });
+            } else if (content.status === 'error') {
+              console.error("Course generation failed:", content.message);
+              if (intervalId) clearInterval(intervalId);
+              setGenerationInBackground(false);
+              setCourseGenerationId(null);
+              
+              sonnerToast.error('Course Generation Failed', {
+                description: content.message || "An unknown error occurred",
+              });
+            }
           }
         } catch (error) {
           console.error("Error checking course generation status:", error);
