@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +21,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Fetch user's courses and interviews when component mounts
   useEffect(() => {
     const fetchUserData = async () => {
       if (!user) {
@@ -33,7 +31,6 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Fetch courses
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
           .select('*')
@@ -44,7 +41,6 @@ const Dashboard = () => {
           throw coursesError;
         }
         
-        // Fetch interviews
         const { data: interviewsData, error: interviewsError } = await supabase
           .from('mock_interviews')
           .select('*')
@@ -55,25 +51,27 @@ const Dashboard = () => {
           throw interviewsError;
         }
         
+        console.log("Courses fetched:", coursesData);
+        console.log("Interviews fetched:", interviewsData);
+        
         setCourses(coursesData || []);
         setInterviews(interviewsData || []);
+        setLoading(false);
       } catch (err) {
         console.error("Dashboard data fetch error:", err);
         setError(err.message);
+        setLoading(false);
         toast({
           title: "Error loading dashboard data",
           description: "Please try refreshing the page",
           variant: "destructive"
         });
-      } finally {
-        setLoading(false);
       }
     };
     
     fetchUserData();
   }, [user, toast]);
 
-  // Simple welcome component when there's no data
   const WelcomeCard = () => (
     <Card className="col-span-full p-6 text-center">
       <CardHeader>
@@ -102,7 +100,6 @@ const Dashboard = () => {
     </Card>
   );
 
-  // Loading skeleton component
   const LoadingSkeleton = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -135,7 +132,6 @@ const Dashboard = () => {
     </div>
   );
 
-  // Error component
   const ErrorDisplay = () => (
     <Card className="p-6 text-center border-red-300">
       <CardHeader>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -25,13 +26,19 @@ const CourseGenerator = () => {
     if (generationInBackground && courseGenerationId) {
       intervalId = window.setInterval(async () => {
         try {
+          console.log("Checking course generation status for ID:", courseGenerationId);
           const { data: course, error } = await supabase
             .from('courses')
             .select('*')
             .eq('id', courseGenerationId)
             .single();
           
-          if (error) throw error;
+          if (error) {
+            console.error("Error checking course status:", error);
+            throw error;
+          }
+          
+          console.log("Course status check result:", course);
           
           if (course && course.content) {
             if (intervalId) clearInterval(intervalId);
@@ -99,7 +106,6 @@ const CourseGenerator = () => {
       }
       
       setCourseGenerationId(emptyCourse.id);
-      
       setGenerationInBackground(true);
       
       generateCourseInBackground(emptyCourse.id, courseName, purpose, difficulty);
