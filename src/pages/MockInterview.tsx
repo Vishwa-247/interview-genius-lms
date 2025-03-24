@@ -390,12 +390,15 @@ const MockInterview = () => {
     difficulty: CourseType['difficulty'],
     userId: string
   ): Promise<any> => {
+    const initialSummary = `A course about ${courseName}`;
+    
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .insert({
         title: courseName,
         purpose,
         difficulty,
+        summary: initialSummary,
         content: { status: 'generating' },
         user_id: userId
       })
@@ -429,7 +432,7 @@ const MockInterview = () => {
     
     console.log("Course generation successful:", generatedData);
     
-    let summary = "An AI-generated course on " + courseName;
+    let summary = initialSummary;
     let content = null;
     
     try {
@@ -866,4 +869,3 @@ const MockInterview = () => {
 };
 
 export default MockInterview;
-
