@@ -78,6 +78,8 @@ serve(async (req) => {
         
         // If courseId is provided, this is a background generation request
         if (data.courseId) {
+          console.log(`Starting background course generation for course ${data.courseId}`);
+          
           // Process in background and immediately return success
           EdgeRuntime.waitUntil(
             processBackgroundCourseGeneration(GEMINI_API_KEY, endpoint, requestBody, data.courseId, data.topic)
@@ -225,7 +227,10 @@ async function processBackgroundCourseGeneration(
       })
       .eq('id', courseId);
       
+    console.log(`Updated course ${courseId} status to generating`);
+      
     // Call Gemini API
+    console.log(`Calling Gemini API for course ${courseId}`);
     const response = await fetch(`${endpoint}?key=${apiKey}`, {
       method: 'POST',
       headers: {
@@ -249,6 +254,7 @@ async function processBackgroundCourseGeneration(
         })
         .eq('id', courseId);
         
+      console.log(`Updated course ${courseId} status to error due to API response error`);
       return;
     }
     
@@ -265,6 +271,9 @@ async function processBackgroundCourseGeneration(
       summary = summaryMatch[1].trim().substring(0, 500);
     }
     
+    // Parse the content into structured format
+    const parsedContent = parseGeneratedContent(text);
+    
     // Update course with complete content
     await supabaseAdmin
       .from('courses')
@@ -274,7 +283,7 @@ async function processBackgroundCourseGeneration(
           status: 'complete',
           fullText: text,
           generatedAt: new Date().toISOString(),
-          parsedContent: parseGeneratedContent(text)
+          parsedContent
         } 
       })
       .eq('id', courseId);
@@ -301,6 +310,8 @@ async function processBackgroundCourseGeneration(
           } 
         })
         .eq('id', courseId);
+        
+      console.log(`Updated course ${courseId} status to error due to background processing error`);
     } catch (updateError) {
       console.error(`Failed to update error status for course ${courseId}:`, updateError);
     }

@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { CourseType } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const CourseGenerator = () => {
   const navigate = useNavigate();
@@ -19,11 +20,14 @@ const CourseGenerator = () => {
   const [generationInBackground, setGenerationInBackground] = useState(false);
   const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
   const [courseGenerationId, setCourseGenerationId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let intervalId: number | null = null;
     
     if (generationInBackground && courseGenerationId) {
+      console.log("Setting up interval to check course generation status for ID:", courseGenerationId);
+      
       intervalId = window.setInterval(async () => {
         try {
           console.log("Checking course generation status for ID:", courseGenerationId);
@@ -38,9 +42,10 @@ const CourseGenerator = () => {
             throw error;
           }
           
-          console.log("Course status check result:", course);
+          console.log("Course status check result:", course?.content);
           
-          if (course && course.content) {
+          if (course && course.content && course.content.status === 'complete') {
+            console.log("Course generation completed!");
             if (intervalId) clearInterval(intervalId);
             setGenerationInBackground(false);
             setCourseGenerationId(null);
@@ -52,18 +57,31 @@ const CourseGenerator = () => {
                 onClick: () => navigate(`/course/${course.id}`),
               },
             });
+          } else if (course && course.content && course.content.status === 'error') {
+            console.error("Course generation failed:", course.content.message);
+            if (intervalId) clearInterval(intervalId);
+            setGenerationInBackground(false);
+            setCourseGenerationId(null);
+            
+            sonnerToast.error('Course Generation Failed', {
+              description: course.content.message || "An unknown error occurred",
+            });
           }
         } catch (error) {
           console.error("Error checking course generation status:", error);
           if (intervalId) clearInterval(intervalId);
           setGenerationInBackground(false);
           setCourseGenerationId(null);
+          setError("Failed to check course generation status. Please try again.");
         }
       }, 5000);
     }
     
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) {
+        console.log("Clearing interval for course generation check");
+        clearInterval(intervalId);
+      }
     };
   }, [generationInBackground, courseGenerationId, navigate]);
 
@@ -78,6 +96,7 @@ const CourseGenerator = () => {
     }
 
     setIsLoading(true);
+    setError(null);
     
     try {
       toast({
@@ -87,6 +106,7 @@ const CourseGenerator = () => {
 
       console.log("Starting course generation for:", courseName);
       
+      // Step 1: Create an empty course entry
       const { data: emptyCourse, error: courseError } = await supabase
         .from('courses')
         .insert({
@@ -95,7 +115,7 @@ const CourseGenerator = () => {
           difficulty,
           user_id: user.id,
           summary: "Course generation in progress...",
-          content: null
+          content: { status: 'generating', lastUpdated: new Date().toISOString() }
         })
         .select()
         .single();
@@ -105,10 +125,32 @@ const CourseGenerator = () => {
         throw new Error(courseError.message || "Failed to create course");
       }
       
+      console.log("Created empty course:", emptyCourse);
+      
       setCourseGenerationId(emptyCourse.id);
       setGenerationInBackground(true);
       
-      generateCourseInBackground(emptyCourse.id, courseName, purpose, difficulty);
+      // Step 2: Call the Gemini API with the background course generation option
+      console.log("Starting background generation for course ID:", emptyCourse.id);
+      
+      const { data: invokeFunctionData, error: invokeFunctionError } = await supabase.functions.invoke('gemini-api', {
+        body: {
+          action: 'generate_course',
+          data: {
+            courseId: emptyCourse.id,
+            topic: courseName,
+            purpose,
+            difficulty
+          }
+        }
+      });
+      
+      console.log("Function invoke response:", invokeFunctionData);
+      
+      if (invokeFunctionError) {
+        console.error("Error invoking function:", invokeFunctionError);
+        throw new Error(invokeFunctionError.message || "Failed to start course generation");
+      }
       
       setRecentCourses(prev => [emptyCourse as CourseType, ...prev]);
       
@@ -121,6 +163,7 @@ const CourseGenerator = () => {
       
     } catch (error: any) {
       console.error("Error starting course generation:", error);
+      setError(error.message || "Failed to start course generation. Please try again later.");
       toast({
         title: "Error",
         description: error.message || "Failed to start course generation. Please try again later.",
@@ -133,190 +176,6 @@ const CourseGenerator = () => {
     }
   };
 
-  const generateCourseInBackground = async (courseId: string, courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
-    try {
-      console.log("Starting background generation for course ID:", courseId);
-      
-      const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
-        body: {
-          action: 'generate_course',
-          data: {
-            topic: courseName,
-            purpose,
-            difficulty
-          }
-        }
-      });
-
-      if (generationError) {
-        console.error("Generation error:", generationError);
-        
-        await supabase
-          .from('courses')
-          .update({
-            summary: "Error generating course. Please try again.",
-            content: { error: true, message: generationError.message }
-          })
-          .eq('id', courseId);
-          
-        return;
-      }
-      
-      if (!generatedData || !generatedData.data) {
-        console.error("Generation failed: No data returned");
-        
-        await supabase
-          .from('courses')
-          .update({
-            summary: "Error generating course. No content received.",
-            content: { error: true, message: "No content received from API" }
-          })
-          .eq('id', courseId);
-          
-        return;
-      }
-      
-      console.log("Course generation successful, processing response...");
-      
-      let summary = "An AI-generated course on " + courseName;
-      let content = null;
-      
-      try {
-        const text = generatedData.data.candidates[0].content.parts[0].text;
-        
-        const parsedContent = parseGeneratedContent(text);
-        
-        summary = parsedContent.summary || summary;
-        
-        content = {
-          parsedContent,
-          generatedAt: new Date().toISOString()
-        };
-        
-        console.log("Content processed successfully, saving to database...");
-      } catch (e) {
-        console.error("Error extracting content:", e);
-        content = { error: "Failed to parse content", message: e instanceof Error ? e.message : String(e) };
-      }
-      
-      const { error: updateError } = await supabase
-        .from('courses')
-        .update({
-          summary,
-          content
-        })
-        .eq('id', courseId);
-      
-      if (updateError) {
-        console.error("Error updating course with generated content:", updateError);
-      }
-      
-    } catch (error: any) {
-      console.error("Background generation error:", error);
-      
-      try {
-        await supabase
-          .from('courses')
-          .update({
-            summary: "Error generating course: " + (error.message || "Unknown error"),
-            content: { error: true, message: error.message || "Unknown error during generation" }
-          })
-          .eq('id', courseId);
-      } catch (updateError) {
-        console.error("Failed to update error status:", updateError);
-      }
-    }
-  };
-
-  const parseGeneratedContent = (text: string) => {
-    const parsedContent: any = {
-      summary: "",
-      chapters: [],
-      flashcards: [],
-      mcqs: [],
-      qnas: []
-    };
-
-    const summaryMatch = text.match(/# SUMMARY\s*\n([\s\S]*?)(?=\n# |\n## |$)/i);
-    if (summaryMatch && summaryMatch[1]) {
-      parsedContent.summary = summaryMatch[1].trim();
-    }
-
-    const chaptersSection = text.match(/# CHAPTERS\s*\n([\s\S]*?)(?=\n# |$)/i);
-    if (chaptersSection && chaptersSection[1]) {
-      const chaptersText = chaptersSection[1];
-      const chapterBlocks = chaptersText.split(/\n(?=## )/g);
-      
-      parsedContent.chapters = chapterBlocks.map((block, index) => {
-        const titleMatch = block.match(/## (.*)/);
-        const title = titleMatch ? titleMatch[1].trim() : `Chapter ${index + 1}`;
-        const content = block.replace(/## .*\n/, '').trim();
-        
-        return {
-          title,
-          content,
-          order_number: index + 1
-        };
-      });
-    }
-
-    const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
-    if (flashcardsSection && flashcardsSection[1]) {
-      const flashcardsText = flashcardsSection[1];
-      const flashcardMatches = [...flashcardsText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
-      
-      parsedContent.flashcards = flashcardMatches.map((match, index) => ({
-        question: match[1].trim(),
-        answer: match[2].trim()
-      }));
-    }
-
-    const mcqsSection = text.match(/# MCQs[\s\S]*?Multiple Choice Questions\)?\s*\n([\s\S]*?)(?=\n# |$)/i);
-    if (mcqsSection && mcqsSection[1]) {
-      const mcqsText = mcqsSection[1];
-      const mcqBlocks = mcqsText.split(/\n(?=- Question: )/g);
-      
-      parsedContent.mcqs = mcqBlocks.filter(block => block.includes('- Question:')).map(block => {
-        const questionMatch = block.match(/- Question: ([\s\S]*?)(?=\n- Options:|\n|$)/);
-        const optionsText = block.match(/- Options:\s*\n([\s\S]*?)(?=\n- Correct Answer:|\n|$)/);
-        const correctAnswerMatch = block.match(/- Correct Answer: ([a-d])/i);
-        
-        const question = questionMatch ? questionMatch[1].trim() : '';
-        
-        let options: string[] = [];
-        if (optionsText && optionsText[1]) {
-          options = optionsText[1]
-            .split(/\n\s*/)
-            .filter(line => /^[a-d]\)/.test(line))
-            .map(line => line.replace(/^[a-d]\)\s*/, '').trim());
-        }
-        
-        const correctAnswer = correctAnswerMatch ? 
-          options[correctAnswerMatch[1].charCodeAt(0) - 'a'.charCodeAt(0)] : 
-          '';
-        
-        return {
-          question,
-          options,
-          correct_answer: correctAnswer
-        };
-      });
-    }
-
-    const qnasSection = text.match(/# Q&A PAIRS\s*\n([\s\S]*?)(?=\n# |$)/i);
-    if (qnasSection && qnasSection[1]) {
-      const qnasText = qnasSection[1];
-      const qnaMatches = [...qnasText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
-      
-      parsedContent.qnas = qnaMatches.map((match, index) => ({
-        question: match[1].trim(),
-        answer: match[2].trim()
-      }));
-    }
-
-    return parsedContent;
-  };
-
   return (
     <Container className="py-12">
       <div className="mb-8">
@@ -325,6 +184,13 @@ const CourseGenerator = () => {
           Create customized courses on any topic with our AI-powered course generator.
         </p>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
