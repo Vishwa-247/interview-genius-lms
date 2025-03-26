@@ -42,7 +42,7 @@ export const useCourseGeneration = () => {
           console.log("Course status check result:", course?.content);
           
           // Type guard to ensure content is an object
-          if (course && course.content && typeof course.content === 'object' && !Array.isArray(course.content)) {
+          if (course && course.content && typeof course.content === 'object') {
             const content = course.content as CourseContent;
             
             if (content.status === 'complete') {
@@ -87,10 +87,69 @@ export const useCourseGeneration = () => {
     };
   }, [generationInBackground, courseGenerationId, navigate]);
 
-  const startCourseGeneration = (courseId: string) => {
-    setCourseGenerationId(courseId);
-    setGenerationInBackground(true);
-    setError(null);
+  // Create a function to start course generation
+  const startCourseGeneration = async (
+    courseName: string, 
+    purpose: CourseType['purpose'], 
+    difficulty: CourseType['difficulty'],
+    userId: string
+  ) => {
+    try {
+      console.log("Starting course generation for:", courseName);
+      
+      // Step 1: Create an empty course entry
+      const { data: emptyCourse, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          title: courseName,
+          purpose,
+          difficulty,
+          user_id: userId,
+          summary: "Course generation in progress...",
+          content: { status: 'generating', lastUpdated: new Date().toISOString() }
+        })
+        .select()
+        .single();
+      
+      if (courseError) {
+        console.error("Error creating empty course:", courseError);
+        throw new Error(courseError.message || "Failed to create course");
+      }
+      
+      console.log("Created empty course:", emptyCourse);
+      
+      // Step 2: Call the Gemini API with the background course generation option
+      console.log("Starting background generation for course ID:", emptyCourse.id);
+      
+      const { data: invokeFunctionData, error: invokeFunctionError } = await supabase.functions.invoke('gemini-api', {
+        body: {
+          action: 'generate_course',
+          data: {
+            courseId: emptyCourse.id,
+            topic: courseName,
+            purpose,
+            difficulty
+          }
+        }
+      });
+      
+      console.log("Function invoke response:", invokeFunctionData);
+      
+      if (invokeFunctionError) {
+        console.error("Error invoking function:", invokeFunctionError);
+        throw new Error(invokeFunctionError.message || "Failed to start course generation");
+      }
+      
+      // Set generation as started
+      setCourseGenerationId(emptyCourse.id);
+      setGenerationInBackground(true);
+      setError(null);
+      
+      return emptyCourse.id;
+    } catch (error: any) {
+      console.error("Error in startCourseGeneration:", error);
+      throw error;
+    }
   };
 
   return {

@@ -2,16 +2,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Container from "@/components/ui/Container";
 import CourseForm from "@/components/course/CourseForm";
 import HowItWorks from "@/components/course/HowItWorks";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { useAuth } from "@/context/AuthContext";
-import { CourseType } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCourseGeneration } from "@/hooks/useCourseGeneration";
 
 const CourseGenerator = () => {
@@ -19,9 +16,7 @@ const CourseGenerator = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
   
-  // Use our custom hook
   const { 
     generationInBackground, 
     error, 
@@ -29,7 +24,7 @@ const CourseGenerator = () => {
     startCourseGeneration 
   } = useCourseGeneration();
 
-  const handleSubmit = async (courseName: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
+  const handleSubmit = async (courseName: string, purpose: string, difficulty: string) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -47,56 +42,9 @@ const CourseGenerator = () => {
         title: "Starting Course Generation",
         description: "This process will continue in the background. You can navigate to other pages.",
       });
-
-      console.log("Starting course generation for:", courseName);
       
-      // Step 1: Create an empty course entry
-      const { data: emptyCourse, error: courseError } = await supabase
-        .from('courses')
-        .insert({
-          title: courseName,
-          purpose,
-          difficulty,
-          user_id: user.id,
-          summary: "Course generation in progress...",
-          content: { status: 'generating', lastUpdated: new Date().toISOString() }
-        })
-        .select()
-        .single();
-      
-      if (courseError) {
-        console.error("Error creating empty course:", courseError);
-        throw new Error(courseError.message || "Failed to create course");
-      }
-      
-      console.log("Created empty course:", emptyCourse);
-      
-      // Start background tracking of course generation
-      startCourseGeneration(emptyCourse.id);
-      
-      // Step 2: Call the Gemini API with the background course generation option
-      console.log("Starting background generation for course ID:", emptyCourse.id);
-      
-      const { data: invokeFunctionData, error: invokeFunctionError } = await supabase.functions.invoke('gemini-api', {
-        body: {
-          action: 'generate_course',
-          data: {
-            courseId: emptyCourse.id,
-            topic: courseName,
-            purpose,
-            difficulty
-          }
-        }
-      });
-      
-      console.log("Function invoke response:", invokeFunctionData);
-      
-      if (invokeFunctionError) {
-        console.error("Error invoking function:", invokeFunctionError);
-        throw new Error(invokeFunctionError.message || "Failed to start course generation");
-      }
-      
-      setRecentCourses(prev => [emptyCourse as CourseType, ...prev]);
+      // Create the course entry and start generation in the background
+      await startCourseGeneration(courseName, purpose, difficulty, user.id);
       
       sonnerToast.info('Course Generation Started', {
         description: 'Your course is being generated in the background. You can continue browsing the site.',
