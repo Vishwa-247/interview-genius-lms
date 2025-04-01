@@ -10,6 +10,7 @@ import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { useCourseGeneration } from "@/hooks/useCourseGeneration";
+import { CourseType } from "@/types";
 
 const CourseGenerator = () => {
   const navigate = useNavigate();
@@ -24,7 +25,11 @@ const CourseGenerator = () => {
     startCourseGeneration 
   } = useCourseGeneration();
 
-  const handleSubmit = async (courseName: string, purpose: string, difficulty: string) => {
+  const handleSubmit = async (
+    courseName: string, 
+    purpose: CourseType['purpose'], 
+    difficulty: CourseType['difficulty']
+  ) => {
     if (!user) {
       toast({
         title: "Authentication Required",
