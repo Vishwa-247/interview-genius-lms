@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,67 +11,74 @@ import { useAuth } from "@/context/AuthContext";
 import Chatbot from "@/components/Chatbot";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [showChatbot, setShowChatbot] = useState(false);
-  const [courses, setCourses] = useState([]);
-  const [interviews, setInterviews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('user_id', user.id);
-          
-        if (coursesError) {
-          console.error("Error fetching courses:", coursesError);
-          throw coursesError;
-        }
-        
-        const { data: interviewsData, error: interviewsError } = await supabase
-          .from('mock_interviews')
-          .select('*')
-          .eq('user_id', user.id);
-          
-        if (interviewsError) {
-          console.error("Error fetching interviews:", interviewsError);
-          throw interviewsError;
-        }
-        
-        console.log("Courses fetched:", coursesData);
-        console.log("Interviews fetched:", interviewsData);
-        
-        setCourses(coursesData || []);
-        setInterviews(interviewsData || []);
-        setLoading(false);
-      } catch (err) {
-        console.error("Dashboard data fetch error:", err);
-        setError(err.message);
-        setLoading(false);
-        toast({
-          title: "Error loading dashboard data",
-          description: "Please try refreshing the page",
-          variant: "destructive"
-        });
-      }
-    };
+  // Use React Query for data fetching with caching
+  const fetchUserCourses = useCallback(async () => {
+    if (!user) return [];
     
-    fetchUserData();
-  }, [user, toast]);
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('user_id', user.id);
+      
+    if (error) throw error;
+    return data || [];
+  }, [user]);
+
+  const fetchUserInterviews = useCallback(async () => {
+    if (!user) return [];
+    
+    const { data, error } = await supabase
+      .from('mock_interviews')
+      .select('*')
+      .eq('user_id', user.id);
+      
+    if (error) throw error;
+    return data || [];
+  }, [user]);
+
+  const { 
+    data: courses = [], 
+    isLoading: isLoadingCourses,
+    error: coursesError
+  } = useQuery({
+    queryKey: ['dashboard-courses', user?.id],
+    queryFn: fetchUserCourses,
+    enabled: !!user,
+    staleTime: 60000 // Cache data for 1 minute
+  });
+
+  const { 
+    data: interviews = [], 
+    isLoading: isLoadingInterviews,
+    error: interviewsError
+  } = useQuery({
+    queryKey: ['dashboard-interviews', user?.id],
+    queryFn: fetchUserInterviews,
+    enabled: !!user,
+    staleTime: 60000 // Cache data for 1 minute
+  });
+
+  // Show toast on errors
+  useEffect(() => {
+    if (coursesError || interviewsError) {
+      toast({
+        title: "Error loading dashboard data",
+        description: "Please try refreshing the page",
+        variant: "destructive"
+      });
+    }
+  }, [coursesError, interviewsError, toast]);
+
+  const isLoading = isLoadingCourses || isLoadingInterviews;
+  const error = coursesError || interviewsError;
 
   const WelcomeCard = () => (
     <Card className="col-span-full p-6 text-center">
@@ -193,7 +201,7 @@ const Dashboard = () => {
             <TabsTrigger value="interviews">Interviews</TabsTrigger>
           </TabsList>
 
-          {loading ? (
+          {isLoading ? (
             <LoadingSkeleton />
           ) : error ? (
             <ErrorDisplay />

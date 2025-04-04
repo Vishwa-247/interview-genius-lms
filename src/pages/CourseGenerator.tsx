@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { useCourseGeneration } from "@/hooks/useCourseGeneration";
 import { CourseType } from "@/types";
+import { useMutation } from "@tanstack/react-query";
 
 const CourseGenerator = () => {
   const navigate = useNavigate();
@@ -24,6 +25,43 @@ const CourseGenerator = () => {
     setError, 
     startCourseGeneration 
   } = useCourseGeneration();
+
+  // Use React Query for mutations to manage loading and error states automatically
+  const generateCourseMutation = useMutation({
+    mutationFn: async ({
+      courseName, 
+      purpose, 
+      difficulty
+    }: {
+      courseName: string;
+      purpose: CourseType['purpose'];
+      difficulty: CourseType['difficulty'];
+    }) => {
+      if (!user) {
+        throw new Error("Authentication required");
+      }
+      return startCourseGeneration(courseName, purpose, difficulty, user.id);
+    },
+    onSuccess: () => {
+      sonnerToast.info('Course Generation Started', {
+        description: 'Your course is being generated in the background with advanced flashcards and interactive elements. You can continue browsing the site.',
+        duration: 6000,
+      });
+      navigate('/dashboard');
+    },
+    onError: (error: Error) => {
+      console.error("Error starting course generation:", error);
+      setError(error.message || "Failed to start course generation. Please try again later.");
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start course generation. Please try again later.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsLoading(false);
+    }
+  });
 
   const handleSubmit = async (
     courseName: string, 
@@ -42,33 +80,13 @@ const CourseGenerator = () => {
     setIsLoading(true);
     setError(null);
     
-    try {
-      toast({
-        title: "Starting Course Generation",
-        description: "This process will continue in the background. You can navigate to other pages.",
-      });
-      
-      // Create the course entry and start generation in the background using our Flask-enabled hook
-      await startCourseGeneration(courseName, purpose, difficulty, user.id);
-      
-      sonnerToast.info('Course Generation Started', {
-        description: 'Your course is being generated in the background with advanced flashcards and interactive elements. You can continue browsing the site.',
-        duration: 6000,
-      });
-      
-      navigate('/dashboard');
-      
-    } catch (error: any) {
-      console.error("Error starting course generation:", error);
-      setError(error.message || "Failed to start course generation. Please try again later.");
-      toast({
-        title: "Error",
-        description: error.message || "Failed to start course generation. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    toast({
+      title: "Starting Course Generation",
+      description: "This process will continue in the background. You can navigate to other pages.",
+    });
+    
+    // Use the mutation to handle the API call
+    generateCourseMutation.mutate({ courseName, purpose, difficulty });
   };
 
   return (

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ChapterType, CourseType, FlashcardType, McqType, QnaType } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 const EmptyState = ({ message, description }: { message: string, description: string }) => (
   <div className="text-center py-12">
@@ -22,7 +23,7 @@ const EmptyState = ({ message, description }: { message: string, description: st
     <h3 className="text-lg font-medium mb-2">{message}</h3>
     <p className="text-muted-foreground max-w-md mx-auto mb-6">{description}</p>
     <Button asChild>
-      <Link to="/course/generate">Generate a Course</Link>
+      <Link to="/course-generator">Generate a Course</Link>
     </Button>
   </div>
 );
@@ -34,7 +35,6 @@ const renderMarkdown = (content: string) => {
     .replace(/^#\s(.+)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4">$1</h1>')
     .replace(/^##\s(.+)$/gm, '<h2 class="text-xl font-bold mt-5 mb-3">$1</h2>')
     .replace(/^###\s(.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
-    // Don't replace every line with <p> tags, only actual paragraphs
     .replace(/^(?!<h[1-6]|<pre|<code|<ul|<ol|<li|<p|<blockquote)(.+)$/gm, '<p class="my-3">$1</p>')
     .replace(/\`\`\`(.+?)\n([\s\S]*?)\`\`\`/g, '<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code>$2</code></pre>')
     .replace(/\`([^\`]+)\`/g, '<code class="bg-muted px-1 py-0.5 rounded text-sm">$1</code>');
@@ -52,136 +52,129 @@ const CourseDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [course, setCourse] = useState<CourseType | null>(null);
-  const [chapters, setChapters] = useState<ChapterType[]>([]);
-  const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
-  const [mcqs, setMcqs] = useState<McqType[]>([]);
-  const [qnas, setQnas] = useState<QnaType[]>([]);
   const [activeTab, setActiveTab] = useState("chapters");
   const [showAnswer, setShowAnswer] = useState<Record<string, boolean>>({});
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const fetchCourseData = async () => {
-      if (!id) {
-        setIsLoading(false);
-        return;
-      }
-      
-      setIsLoading(true);
-      
-      try {
-        // Fetch course data
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', id)
-          .single();
-        
-        if (courseError) {
-          console.error("Error fetching course:", courseError);
-          toast({
-            title: "Error",
-            description: "Could not fetch course data. Please try again.",
-            variant: "destructive"
-          });
-          setIsLoading(false);
-          return;
-        }
-        
-        if (!courseData) {
-          setIsLoading(false);
-          return;
-        }
-        
-        setCourse(courseData as CourseType);
-        
-        // Process content from the course data - with better type checking
-        if (courseData.content && isValidContentObject(courseData.content)) {
-          const { parsedContent } = courseData.content;
-          
-          // Process chapters
-          if (parsedContent.chapters && Array.isArray(parsedContent.chapters)) {
-            const processedChapters = parsedContent.chapters.map((chapter, index) => ({
-              id: `ch${index}`,
-              course_id: id,
-              title: chapter.title,
-              content: chapter.content,
-              order_number: chapter.order_number || index + 1,
-              created_at: courseData.created_at,
-              updated_at: courseData.created_at
-            }));
-            setChapters(processedChapters);
-          }
-          
-          // Process flashcards
-          if (parsedContent.flashcards && Array.isArray(parsedContent.flashcards)) {
-            const processedFlashcards = parsedContent.flashcards.map((flashcard, index) => ({
-              id: `f${index}`,
-              course_id: id,
-              question: flashcard.question,
-              answer: flashcard.answer,
-              created_at: courseData.created_at
-            }));
-            setFlashcards(processedFlashcards);
-          }
-          
-          // Process MCQs
-          if (parsedContent.mcqs && Array.isArray(parsedContent.mcqs)) {
-            const processedMcqs = parsedContent.mcqs.map((mcq, index) => ({
-              id: `m${index}`,
-              course_id: id,
-              question: mcq.question,
-              options: mcq.options || ["Option A", "Option B", "Option C", "Option D"],
-              correct_answer: mcq.correct_answer,
-              created_at: courseData.created_at
-            }));
-            setMcqs(processedMcqs);
-          }
-          
-          // Process Q&As
-          if (parsedContent.qnas && Array.isArray(parsedContent.qnas)) {
-            const processedQnas = parsedContent.qnas.map((qna, index) => ({
-              id: `q${index}`,
-              course_id: id,
-              question: qna.question,
-              answer: qna.answer,
-              created_at: courseData.created_at
-            }));
-            setQnas(processedQnas);
-          }
-        } else {
-          console.log("Course content is not in the expected format:", courseData.content);
-        }
-      } catch (error) {
-        console.error("Error in useEffect:", error);
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fetch course data with React Query
+  const fetchCourseData = useCallback(async () => {
+    if (!id) throw new Error("Course ID is required");
     
-    fetchCourseData();
-  }, [id, toast]);
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) throw new Error("Course not found");
+    
+    return data as CourseType;
+  }, [id]);
 
-  const toggleAnswer = (id: string) => {
+  const { 
+    data: course,
+    isLoading,
+    error 
+  } = useQuery({
+    queryKey: ['course-detail', id],
+    queryFn: fetchCourseData,
+    enabled: !!id,
+    staleTime: 300000, // Cache for 5 minutes
+    onError: (err: Error) => {
+      toast({
+        title: "Error",
+        description: err.message || "Could not fetch course data",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Process course content
+  const [chapters, setChapters] = useState<ChapterType[]>([]);
+  const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
+  const [mcqs, setMcqs] = useState<McqType[]>([]);
+  const [qnas, setQnas] = useState<QnaType[]>([]);
+
+  // Process content once course data is loaded
+  useEffect(() => {
+    if (!course || !course.content) return;
+    
+    try {
+      if (isValidContentObject(course.content)) {
+        const { parsedContent } = course.content;
+        
+        // Process chapters
+        if (parsedContent.chapters && Array.isArray(parsedContent.chapters)) {
+          const processedChapters = parsedContent.chapters.map((chapter, index) => ({
+            id: `ch${index}`,
+            course_id: id || '',
+            title: chapter.title,
+            content: chapter.content,
+            order_number: chapter.order_number || index + 1,
+            created_at: course.created_at,
+            updated_at: course.created_at
+          }));
+          setChapters(processedChapters);
+        }
+        
+        // Process flashcards
+        if (parsedContent.flashcards && Array.isArray(parsedContent.flashcards)) {
+          const processedFlashcards = parsedContent.flashcards.map((flashcard, index) => ({
+            id: `f${index}`,
+            course_id: id || '',
+            question: flashcard.question,
+            answer: flashcard.answer,
+            created_at: course.created_at
+          }));
+          setFlashcards(processedFlashcards);
+        }
+        
+        // Process MCQs
+        if (parsedContent.mcqs && Array.isArray(parsedContent.mcqs)) {
+          const processedMcqs = parsedContent.mcqs.map((mcq, index) => ({
+            id: `m${index}`,
+            course_id: id || '',
+            question: mcq.question,
+            options: mcq.options || ["Option A", "Option B", "Option C", "Option D"],
+            correct_answer: mcq.correct_answer,
+            created_at: course.created_at
+          }));
+          setMcqs(processedMcqs);
+        }
+        
+        // Process Q&As
+        if (parsedContent.qnas && Array.isArray(parsedContent.qnas)) {
+          const processedQnas = parsedContent.qnas.map((qna, index) => ({
+            id: `q${index}`,
+            course_id: id || '',
+            question: qna.question,
+            answer: qna.answer,
+            created_at: course.created_at
+          }));
+          setQnas(processedQnas);
+        }
+      } else {
+        console.log("Course content is not in the expected format:", course.content);
+      }
+    } catch (err) {
+      console.error("Error processing course content:", err);
+    }
+  }, [course, id]);
+
+  const toggleAnswer = useCallback((id: string) => {
     setShowAnswer(prev => ({
       ...prev,
       [id]: !prev[id]
     }));
-  };
+  }, []);
 
-  const handleSelectAnswer = (id: string, option: string) => {
+  const handleSelectAnswer = useCallback((id: string, option: string) => {
     setSelectedAnswers(prev => ({
       ...prev,
       [id]: option
     }));
-  };
+  }, []);
 
   // Render loading state
   if (isLoading) {
@@ -196,8 +189,8 @@ const CourseDetail = () => {
     );
   }
 
-  // If no course found
-  if (!course) {
+  // If error or no course found
+  if (error || !course) {
     return (
       <Container className="py-12">
         <EmptyState 
@@ -392,7 +385,7 @@ const CourseDetail = () => {
         <TabsContent value="qna" className="space-y-6">
           {qnas.length > 0 ? (
             <Accordion type="single" collapsible className="w-full">
-              {qnas.map((qna, index) => (
+              {qnas.map((qna) => (
                 <AccordionItem key={qna.id} value={qna.id}>
                   <AccordionTrigger className="text-left font-medium">
                     {qna.question}
