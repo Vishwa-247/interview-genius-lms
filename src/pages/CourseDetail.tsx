@@ -81,12 +81,16 @@ const CourseDetail = () => {
     queryFn: fetchCourseData,
     enabled: !!id,
     staleTime: 300000, // Cache for 5 minutes
-    onError: (err: Error) => {
-      toast({
-        title: "Error",
-        description: err.message || "Could not fetch course data",
-        variant: "destructive"
-      });
+    meta: {
+      onSettled: (_, err) => {
+        if (err) {
+          toast({
+            title: "Error",
+            description: err.message || "Could not fetch course data",
+            variant: "destructive"
+          });
+        }
+      }
     }
   });
 

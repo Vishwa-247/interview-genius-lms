@@ -1,4 +1,3 @@
-
 export type CourseType = {
   id: string;
   user_id: string;
@@ -7,6 +6,19 @@ export type CourseType = {
   difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
   summary?: string;
   created_at: string;
+  content?: {
+    status?: string;
+    message?: string;
+    lastUpdated?: string;
+    parsedContent?: {
+      summary?: string;
+      chapters?: any[];
+      flashcards?: any[];
+      mcqs?: any[];
+      qnas?: any[];
+    };
+    [key: string]: any;
+  };
 };
 
 export type ChapterType = {

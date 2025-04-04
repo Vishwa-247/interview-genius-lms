@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import CourseForm from "@/components/course/CourseForm";
 import { supabase } from "@/integrations/supabase/client";
-import { generateInterviewQuestionsWithFlask } from "@/services/flaskApi";
+import { generateInterviewQuestionsWithFlask, TextResponse } from "@/services/flaskApi";
 import { useCourseGeneration } from "@/hooks/useCourseGeneration";
 
 enum InterviewStage {
@@ -138,7 +138,7 @@ const MockInterview = () => {
       
       let questionList: string[] = [];
       try {
-        const text = generatedData.text();
+        const text = generatedData.text;
         questionList = text
           .split(/\d+\./)
           .map(q => q.trim())

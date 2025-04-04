@@ -31,6 +31,11 @@ const callFlaskApi = async <T>(endpoint: string, data: any): Promise<T> => {
   }
 };
 
+// Type for API responses containing text content
+export interface TextResponse {
+  text: string;
+}
+
 /**
  * Generate a complete course using the Flask API
  */
@@ -38,8 +43,8 @@ export const generateCourseWithFlask = async (
   topic: string,
   purpose: string,
   difficulty: string
-) => {
-  return callFlaskApi('/generate', {
+): Promise<TextResponse> => {
+  return callFlaskApi<TextResponse>('/generate', {
     action: 'generate_course',
     topic,
     purpose,
@@ -55,8 +60,8 @@ export const generateInterviewQuestionsWithFlask = async (
   techStack: string,
   experience: string,
   questionCount: number = 5
-) => {
-  return callFlaskApi('/generate', {
+): Promise<TextResponse> => {
+  return callFlaskApi<TextResponse>('/generate', {
     action: 'generate_interview_questions',
     jobRole,
     techStack,
@@ -72,7 +77,7 @@ export const generateFlashcardsWithFlask = async (
   topic: string,
   purpose: string,
   difficulty: string
-) => {
+): Promise<TextResponse> => {
   // Use custom_content action for flashcard generation
   const prompt = `Generate 20 detailed flashcards on the topic: ${topic} for ${purpose} at ${difficulty} level.
                   
@@ -86,7 +91,7 @@ export const generateFlashcardsWithFlask = async (
                   Each answer should be detailed enough to provide complete understanding.
                   Ensure varying difficulty levels across the flashcards to test different aspects of knowledge.`;
 
-  return callFlaskApi<string>('/generate', {
+  return callFlaskApi<TextResponse>('/generate', {
     action: 'custom_content',
     prompt
   });
@@ -95,8 +100,8 @@ export const generateFlashcardsWithFlask = async (
 /**
  * Summarize text using the Flask API
  */
-export const summarizeTextWithFlask = async (text: string) => {
-  return callFlaskApi<string>('/generate', {
+export const summarizeTextWithFlask = async (text: string): Promise<TextResponse> => {
+  return callFlaskApi<TextResponse>('/generate', {
     action: 'summarize_text',
     text
   });
@@ -105,8 +110,8 @@ export const summarizeTextWithFlask = async (text: string) => {
 /**
  * Explain code using the Flask API
  */
-export const explainCodeWithFlask = async (code: string) => {
-  return callFlaskApi<string>('/generate', {
+export const explainCodeWithFlask = async (code: string): Promise<TextResponse> => {
+  return callFlaskApi<TextResponse>('/generate', {
     action: 'explain_code',
     code
   });

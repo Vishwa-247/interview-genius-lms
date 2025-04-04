@@ -147,7 +147,7 @@ const Dashboard = () => {
         <CardTitle className="text-xl text-red-500">Unable to Load Dashboard</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="mb-4">{error || "There was a problem loading your data. Please try again later."}</p>
+        <p className="mb-4">{error instanceof Error ? error.message : "There was a problem loading your data. Please try again later."}</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
           Refresh
         </Button>

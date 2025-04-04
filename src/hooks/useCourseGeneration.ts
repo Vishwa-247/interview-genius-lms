@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { CourseType } from "@/types";
-import { generateCourseWithFlask, generateFlashcardsWithFlask } from "@/services/flaskApi";
+import { generateCourseWithFlask, generateFlashcardsWithFlask, TextResponse } from "@/services/flaskApi";
 import { FLASK_API_URL } from "@/configs/environment";
 
 // Define an interface for the content structure
@@ -190,7 +190,7 @@ export const useCourseGeneration = () => {
       console.log(`Background generation completed successfully for course ${courseId}`);
       
       // Extract text content
-      const text = responseData.text();
+      const text = responseData.text;
       
       // Extract summary
       let summary = `An AI-generated course on ${topic}`;
@@ -301,7 +301,7 @@ export const useCourseGeneration = () => {
       console.log(`Flashcards generation completed successfully for course ${courseId}`);
       
       // Extract text content
-      const text = responseData.text();
+      const text = responseData.text;
       
       // Parse the flashcards
       const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
