@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { CourseType } from "@/types";
+import { generateCourseWithFlask, generateFlashcardsWithFlask } from "@/services/flaskApi";
 
 // Define an interface for the content structure
 interface CourseContent {
@@ -133,32 +134,21 @@ export const useCourseGeneration = () => {
       
       console.log("Created empty course:", emptyCourse);
       
-      // Step 2: Call the Gemini API with the background course generation option
+      // Step 2: Start the background process to generate course content using Flask
       console.log("Starting background generation for course ID:", emptyCourse.id);
-      
-      const { data: invokeFunctionData, error: invokeFunctionError } = await supabase.functions.invoke('gemini-api', {
-        body: {
-          action: 'generate_course',
-          data: {
-            courseId: emptyCourse.id,
-            topic: courseName,
-            purpose,
-            difficulty
-          }
-        }
-      });
-      
-      console.log("Function invoke response:", invokeFunctionData);
-      
-      if (invokeFunctionError) {
-        console.error("Error invoking function:", invokeFunctionError);
-        throw new Error(invokeFunctionError.message || "Failed to start course generation");
-      }
-      
-      // Set generation as started
+
+      // Set generation as started so the UI shows progress
       setCourseGenerationId(emptyCourse.id);
       setGenerationInBackground(true);
       setError(null);
+
+      // Start the background process
+      processBackgroundCourseGeneration(
+        courseName,
+        purpose,
+        difficulty,
+        emptyCourse.id
+      );
       
       return emptyCourse.id;
     } catch (error: any) {
@@ -167,29 +157,237 @@ export const useCourseGeneration = () => {
     }
   };
 
+  // Background processing function to handle course generation with Flask API
+  const processBackgroundCourseGeneration = async (
+    topic: string,
+    purpose: CourseType['purpose'],
+    difficulty: CourseType['difficulty'],
+    courseId: string
+  ) => {
+    try {
+      // Update course status to generating
+      await supabase
+        .from('courses')
+        .update({ 
+          content: { status: 'generating', lastUpdated: new Date().toISOString() } 
+        })
+        .eq('id', courseId);
+        
+      console.log(`Updated course ${courseId} status to generating`);
+        
+      // Call Flask API
+      console.log(`Calling Flask API for course ${courseId}`);
+      const responseData = await generateCourseWithFlask(topic, purpose, difficulty);
+      
+      console.log(`Background generation completed successfully for course ${courseId}`);
+      
+      // Extract text content
+      const text = responseData.text();
+      
+      // Extract summary
+      let summary = `An AI-generated course on ${topic}`;
+      const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
+      if (summaryMatch && summaryMatch[1]) {
+        summary = summaryMatch[1].trim().substring(0, 500);
+      }
+      
+      // Parse the content into structured format
+      const parsedContent = parseGeneratedContent(text);
+      
+      // Update course with complete content
+      await supabase
+        .from('courses')
+        .update({ 
+          summary,
+          content: {
+            status: 'complete',
+            fullText: text,
+            generatedAt: new Date().toISOString(),
+            parsedContent
+          } 
+        })
+        .eq('id', courseId);
+        
+      console.log(`Course ${courseId} updated with generated content`);
+      
+      // After main course generation is complete, start flashcard generation as a separate background process
+      // First, check if the parsed content has flashcards, if not, trigger separate flashcard generation
+      if (!parsedContent.flashcards || parsedContent.flashcards.length < 5) {
+        console.log(`Triggering separate flashcard generation for course ${courseId}`);
+        
+        try {
+          // Get course details to pass to the flashcard generation
+          const { data: courseData, error: courseError } = await supabase
+            .from('courses')
+            .select('title, purpose, difficulty')
+            .eq('id', courseId)
+            .single();
+            
+          if (courseError) {
+            throw new Error(`Error fetching course data: ${courseError.message}`);
+          }
+          
+          // Start flashcard generation in background
+          processBackgroundFlashcardsGeneration(
+            courseData.title,
+            courseData.purpose,
+            courseData.difficulty,
+            courseId
+          );
+          
+          console.log(`Successfully triggered flashcard generation for course ${courseId}`);
+        } catch (flashcardError) {
+          console.error(`Error triggering flashcard generation: ${flashcardError}`);
+        }
+      }
+      
+    } catch (error) {
+      console.error(`Error in background processing for course ${courseId}:`, error);
+      
+      // Try to update the course with error status
+      try {
+        await supabase
+          .from('courses')
+          .update({ 
+            content: { 
+              status: 'error', 
+              message: error.message || 'Unknown error during background processing',
+              lastUpdated: new Date().toISOString()
+            } 
+          })
+          .eq('id', courseId);
+          
+        console.log(`Updated course ${courseId} status to error due to background processing error`);
+      } catch (updateError) {
+        console.error(`Failed to update error status for course ${courseId}:`, updateError);
+      }
+    }
+  };
+
+  // Background processing function for flashcards generation with Flask API
+  const processBackgroundFlashcardsGeneration = async (
+    topic: string,
+    purpose: CourseType['purpose'],
+    difficulty: CourseType['difficulty'],
+    courseId: string
+  ) => {
+    console.log(`Starting background flashcards generation for course ${courseId}`);
+    
+    try {
+      // Update status that we're generating flashcards
+      await supabase
+        .from('courses')
+        .update({ 
+          content: { 
+            status: 'generating_flashcards', 
+            message: "Generating additional flashcards",
+            lastUpdated: new Date().toISOString() 
+          } 
+        })
+        .eq('id', courseId);
+        
+      // Call Flask API for flashcards
+      console.log(`Calling Flask API for flashcards generation for course ${courseId}`);
+      const responseData = await generateFlashcardsWithFlask(topic, purpose, difficulty);
+      
+      console.log(`Flashcards generation completed successfully for course ${courseId}`);
+      
+      // Extract text content
+      const text = responseData.text();
+      
+      // Parse the flashcards
+      const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
+      let flashcards = [];
+      
+      if (flashcardsSection && flashcardsSection[1]) {
+        const flashcardsText = flashcardsSection[1];
+        const flashcardMatches = [...flashcardsText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+        
+        flashcards = flashcardMatches.map((match) => ({
+          question: match[1].trim(),
+          answer: match[2].trim()
+        }));
+      }
+      
+      if (flashcards.length > 0) {
+        // First get the existing course data
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('content')
+          .eq('id', courseId)
+          .single();
+          
+        if (courseError) {
+          throw new Error(`Error fetching course data: ${courseError.message}`);
+        }
+        
+        // Extract the existing content
+        const content = courseData.content || {};
+        const parsedContent = content.parsedContent || {};
+        
+        // Combine existing flashcards with new ones
+        const existingFlashcards = parsedContent.flashcards || [];
+        const combinedFlashcards = [...existingFlashcards, ...flashcards];
+        
+        // Update the course with the new flashcards
+        await supabase
+          .from('courses')
+          .update({ 
+            content: {
+              ...content,
+              status: 'complete',
+              lastUpdated: new Date().toISOString(),
+              parsedContent: {
+                ...parsedContent,
+                flashcards: combinedFlashcards
+              }
+            }
+          })
+          .eq('id', courseId);
+          
+        console.log(`Updated course ${courseId} with ${flashcards.length} additional flashcards`);
+        
+        // Also store flashcards in the flashcards table
+        const flashcardsWithCourseId = flashcards.map(flashcard => ({
+          ...flashcard,
+          course_id: courseId
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('flashcards')
+          .insert(flashcardsWithCourseId);
+          
+        if (insertError) {
+          console.error(`Error inserting flashcards into flashcards table: ${insertError.message}`);
+        } else {
+          console.log(`Successfully inserted ${flashcards.length} flashcards into flashcards table`);
+        }
+      }
+      
+    } catch (error) {
+      console.error(`Error in flashcards generation for course ${courseId}:`, error);
+    }
+  };
+
   // Function to generate additional flashcards for an existing course
   const generateAdditionalFlashcards = async (courseId: string, topic: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
     try {
       console.log(`Generating additional flashcards for course ${courseId}`);
       
-      const { data, error } = await supabase.functions.invoke('gemini-api', {
-        body: {
-          action: 'generate_flashcards',
-          data: {
-            courseId,
-            topic,
-            purpose,
-            difficulty
-          }
-        }
-      });
+      // Update course status to indicate flashcard generation
+      await supabase
+        .from('courses')
+        .update({ 
+          content: { 
+            status: 'generating_flashcards', 
+            message: "Generating additional flashcards",
+            lastUpdated: new Date().toISOString() 
+          } 
+        })
+        .eq('id', courseId);
       
-      if (error) {
-        console.error("Error generating additional flashcards:", error);
-        throw error;
-      }
-      
-      console.log("Additional flashcards generation started:", data);
+      // Start the background process
+      processBackgroundFlashcardsGeneration(topic, purpose, difficulty, courseId);
       
       sonnerToast.info('Enhancing Your Course', {
         description: 'Generating additional flashcards for your course. This will happen in the background.',
@@ -203,6 +401,101 @@ export const useCourseGeneration = () => {
       });
       return false;
     }
+  };
+
+  // Helper function to parse the generated content
+  const parseGeneratedContent = (text: string) => {
+    const parsedContent = {
+      summary: "",
+      chapters: [],
+      flashcards: [],
+      mcqs: [],
+      qnas: []
+    };
+
+    // Extract summary
+    const summaryMatch = text.match(/# SUMMARY\s*\n([\s\S]*?)(?=\n# |\n## |$)/i);
+    if (summaryMatch && summaryMatch[1]) {
+      parsedContent.summary = summaryMatch[1].trim();
+    }
+
+    // Extract chapters
+    const chaptersSection = text.match(/# CHAPTERS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (chaptersSection && chaptersSection[1]) {
+      const chaptersText = chaptersSection[1];
+      const chapterBlocks = chaptersText.split(/\n(?=## )/g);
+      
+      parsedContent.chapters = chapterBlocks.map((block, index) => {
+        const titleMatch = block.match(/## (.*)/);
+        const title = titleMatch ? titleMatch[1].trim() : `Chapter ${index + 1}`;
+        const content = block.replace(/## .*\n/, '').trim();
+        
+        return {
+          title,
+          content,
+          order_number: index + 1
+        };
+      });
+    }
+
+    // Extract flashcards
+    const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (flashcardsSection && flashcardsSection[1]) {
+      const flashcardsText = flashcardsSection[1];
+      const flashcardMatches = [...flashcardsText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+      
+      parsedContent.flashcards = flashcardMatches.map((match) => ({
+        question: match[1].trim(),
+        answer: match[2].trim()
+      }));
+    }
+
+    // Extract MCQs
+    const mcqsSection = text.match(/# MCQs[\s\S]*?(?:Multiple Choice Questions\)?)?\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (mcqsSection && mcqsSection[1]) {
+      const mcqsText = mcqsSection[1];
+      const mcqBlocks = mcqsText.split(/\n(?=- Question: )/g);
+      
+      parsedContent.mcqs = mcqBlocks.filter(block => block.includes('- Question:')).map(block => {
+        const questionMatch = block.match(/- Question: ([\s\S]*?)(?=\n- Options:|\n|$)/);
+        const optionsText = block.match(/- Options:\s*\n([\s\S]*?)(?=\n- Correct Answer:|\n|$)/);
+        const correctAnswerMatch = block.match(/- Correct Answer: ([a-d])/i);
+        
+        const question = questionMatch ? questionMatch[1].trim() : '';
+        
+        let options = [];
+        if (optionsText && optionsText[1]) {
+          options = optionsText[1]
+            .split(/\n\s*/)
+            .filter(line => /^[a-d]\)/.test(line))
+            .map(line => line.replace(/^[a-d]\)\s*/, '').trim());
+        }
+        
+        const correctAnswer = correctAnswerMatch ? 
+          options[correctAnswerMatch[1].charCodeAt(0) - 'a'.charCodeAt(0)] : 
+          '';
+        
+        return {
+          question,
+          options,
+          correct_answer: correctAnswer
+        };
+      });
+    }
+
+    // Extract Q&As
+    const qnasSection = text.match(/# Q&A PAIRS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    if (qnasSection && qnasSection[1]) {
+      const qnasText = qnasSection[1];
+      const qnaMatches = [...qnasText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+      
+      parsedContent.qnas = qnaMatches.map((match) => ({
+        question: match[1].trim(),
+        answer: match[2].trim()
+      }));
+    }
+
+    return parsedContent;
   };
 
   return {

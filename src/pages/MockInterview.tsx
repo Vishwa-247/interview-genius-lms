@@ -11,6 +11,8 @@ import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import CourseForm from "@/components/course/CourseForm";
 import { supabase } from "@/integrations/supabase/client";
+import { generateInterviewQuestionsWithFlask } from "@/services/flaskApi";
+import { useCourseGeneration } from "@/hooks/useCourseGeneration";
 
 enum InterviewStage {
   Setup = "setup",
@@ -36,6 +38,8 @@ const MockInterview = () => {
   const [recentCourses, setRecentCourses] = useState<CourseType[]>([]);
   const [recordingComplete, setRecordingComplete] = useState(false);
   const isMounted = useRef(true);
+  
+  const { startCourseGeneration } = useCourseGeneration();
 
   useEffect(() => {
     isMounted.current = true;
@@ -121,27 +125,20 @@ const MockInterview = () => {
       setInterviewData(interview);
       console.log("Interview created:", interview);
 
-      const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
-        body: {
-          action: 'generate_interview_questions',
-          data: {
-            jobRole: role,
-            techStack,
-            experience,
-            questionCount: 5
-          }
-        }
-      });
+      const generatedData = await generateInterviewQuestionsWithFlask(
+        role,
+        techStack,
+        experience,
+        5
+      );
 
       if (!isMounted.current) return;
-
-      if (generationError) throw generationError;
       
       console.log("Generated questions data:", generatedData);
       
       let questionList: string[] = [];
       try {
-        const text = generatedData.data.candidates[0].content.parts[0].text;
+        const text = generatedData.text();
         questionList = text
           .split(/\d+\./)
           .map(q => q.trim())
@@ -331,7 +328,7 @@ const MockInterview = () => {
         description: "Please wait while we create your course. This may take a minute.",
       });
 
-      const coursePromise = generateCourse(courseName, purpose, difficulty, user.id);
+      const courseId = await startCourseGeneration(courseName, purpose, difficulty, user.id);
       
       const timeoutId = setTimeout(() => {
         if (isMounted.current) {
@@ -342,134 +339,40 @@ const MockInterview = () => {
         }
       }, 3000);
       
-      coursePromise
-        .then((course) => {
-          clearTimeout(timeoutId);
-          if (isMounted.current) {
-            setRecentCourses(prev => [course as CourseType, ...prev]);
-            toast({
-              title: "Course Generated Successfully",
-              description: "Your course is now ready to view!",
-            });
-            navigate(`/course/${course.id}`);
-          }
-        })
-        .catch((error) => {
-          clearTimeout(timeoutId);
-          console.error("Error creating course:", error);
-          if (isMounted.current) {
-            toast({
-              title: "Error",
-              description: "Failed to create course. Please try again.",
-              variant: "destructive",
-            });
-          }
-        })
-        .finally(() => {
-          if (isMounted.current) {
-            setIsGeneratingCourse(false);
-          }
-        });
+      const { data: course, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
       
+      clearTimeout(timeoutId);
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (isMounted.current) {
+        setRecentCourses(prev => [course as CourseType, ...prev]);
+        toast({
+          title: "Course Generation Started",
+          description: "Your course is now being generated in the background!",
+        });
+        navigate(`/dashboard`);
+      }
     } catch (error) {
-      console.error("Error initiating course generation:", error);
+      console.error("Error creating course:", error);
       if (isMounted.current) {
         toast({
           title: "Error",
-          description: "Failed to initiate course generation. Please try again.",
+          description: "Failed to create course. Please try again.",
           variant: "destructive",
         });
+      }
+    } finally {
+      if (isMounted.current) {
         setIsGeneratingCourse(false);
       }
     }
-  };
-
-  const generateCourse = async (
-    courseName: string, 
-    purpose: CourseType['purpose'], 
-    difficulty: CourseType['difficulty'],
-    userId: string
-  ): Promise<any> => {
-    const initialSummary = `A course about ${courseName}`;
-    
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .insert({
-        title: courseName,
-        purpose,
-        difficulty,
-        summary: initialSummary,
-        content: { status: 'generating' },
-        user_id: userId
-      })
-      .select()
-      .single();
-    
-    if (courseError) throw courseError;
-    
-    const { data: generatedData, error: generationError } = await supabase.functions.invoke('gemini-api', {
-      body: {
-        action: 'generate_course',
-        data: {
-          topic: courseName,
-          purpose,
-          difficulty
-        }
-      }
-    });
-
-    if (generationError || !generatedData || !generatedData.data) {
-      console.error("Generation error:", generationError || "Failed to generate course content");
-      await supabase
-        .from('courses')
-        .update({
-          content: { status: 'error', message: 'Failed to generate course content' }
-        })
-        .eq('id', course.id);
-        
-      throw new Error("Failed to generate course content");
-    }
-    
-    console.log("Course generation successful:", generatedData);
-    
-    let summary = initialSummary;
-    let content = null;
-    
-    try {
-      const text = generatedData.data.candidates[0].content.parts[0].text;
-      const summaryMatch = text.match(/SUMMARY[:\n]+([^#]+)/i);
-      
-      if (summaryMatch && summaryMatch[1]) {
-        summary = summaryMatch[1].trim().substring(0, 500);
-      }
-      
-      content = {
-        status: 'complete',
-        fullText: text,
-        generatedAt: new Date().toISOString()
-      };
-      
-      await supabase
-        .from('courses')
-        .update({
-          summary,
-          content
-        })
-        .eq('id', course.id);
-      
-    } catch (e) {
-      console.error("Error extracting summary or updating course:", e);
-      await supabase
-        .from('courses')
-        .update({
-          content: { status: 'error', message: 'Error processing generated content' }
-        })
-        .eq('id', course.id);
-        
-      throw e;
-    }
-    
-    return course;
   };
 
   const startRecording = () => {

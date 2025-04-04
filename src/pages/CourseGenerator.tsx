@@ -48,7 +48,7 @@ const CourseGenerator = () => {
         description: "This process will continue in the background. You can navigate to other pages.",
       });
       
-      // Create the course entry and start generation in the background
+      // Create the course entry and start generation in the background using our Flask-enabled hook
       await startCourseGeneration(courseName, purpose, difficulty, user.id);
       
       sonnerToast.info('Course Generation Started', {
