@@ -52,8 +52,8 @@ const CourseGenerator = () => {
       await startCourseGeneration(courseName, purpose, difficulty, user.id);
       
       sonnerToast.info('Course Generation Started', {
-        description: 'Your course is being generated in the background. You can continue browsing the site.',
-        duration: 5000,
+        description: 'Your course is being generated in the background with advanced flashcards and interactive elements. You can continue browsing the site.',
+        duration: 6000,
       });
       
       navigate('/dashboard');

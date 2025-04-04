@@ -45,6 +45,7 @@ export const useCourseGeneration = () => {
           if (course && course.content && typeof course.content === 'object') {
             const content = course.content as CourseContent;
             
+            // Check if course is fully complete
             if (content.status === 'complete') {
               console.log("Course generation completed!");
               if (intervalId) clearInterval(intervalId);
@@ -58,7 +59,21 @@ export const useCourseGeneration = () => {
                   onClick: () => navigate(`/course/${course.id}`),
                 },
               });
-            } else if (content.status === 'error') {
+            } 
+            // Check if we're generating additional resources like flashcards
+            else if (content.status === 'generating_flashcards') {
+              console.log("Generating additional flashcards for the course");
+              // Continue checking, don't clear the interval
+              
+              // Show a toast notification about the ongoing flashcards generation
+              if (content.message) {
+                sonnerToast.info('Enhancing Your Course', {
+                  description: content.message,
+                });
+              }
+            }
+            // Check if there was an error in generation
+            else if (content.status === 'error') {
               console.error("Course generation failed:", content.message);
               if (intervalId) clearInterval(intervalId);
               setGenerationInBackground(false);
@@ -152,11 +167,50 @@ export const useCourseGeneration = () => {
     }
   };
 
+  // Function to generate additional flashcards for an existing course
+  const generateAdditionalFlashcards = async (courseId: string, topic: string, purpose: CourseType['purpose'], difficulty: CourseType['difficulty']) => {
+    try {
+      console.log(`Generating additional flashcards for course ${courseId}`);
+      
+      const { data, error } = await supabase.functions.invoke('gemini-api', {
+        body: {
+          action: 'generate_flashcards',
+          data: {
+            courseId,
+            topic,
+            purpose,
+            difficulty
+          }
+        }
+      });
+      
+      if (error) {
+        console.error("Error generating additional flashcards:", error);
+        throw error;
+      }
+      
+      console.log("Additional flashcards generation started:", data);
+      
+      sonnerToast.info('Enhancing Your Course', {
+        description: 'Generating additional flashcards for your course. This will happen in the background.',
+      });
+      
+      return true;
+    } catch (error: any) {
+      console.error("Error in generateAdditionalFlashcards:", error);
+      sonnerToast.error('Error', {
+        description: error.message || "Failed to generate additional flashcards",
+      });
+      return false;
+    }
+  };
+
   return {
     generationInBackground,
     courseGenerationId,
     error,
     setError,
-    startCourseGeneration
+    startCourseGeneration,
+    generateAdditionalFlashcards
   };
 };

@@ -144,6 +144,48 @@ serve(async (req) => {
         };
         break;
 
+      case 'generate_flashcards':
+        endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        requestBody = {
+          contents: [{
+            parts: [{
+              text: `Generate 20 detailed flashcards on the topic: ${data.topic} for ${data.purpose} at ${data.difficulty} level.
+                     
+                     Create flashcards in this exact format:
+                     
+                     # FLASHCARDS
+                     - Question: [Specific, clear question text]
+                     - Answer: [Comprehensive, accurate answer text]
+                     
+                     Make sure the flashcards cover key concepts, terms, principles, and applications related to the topic.
+                     Each answer should be detailed enough to provide complete understanding.
+                     Ensure varying difficulty levels across the flashcards to test different aspects of knowledge.`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 4096,
+          }
+        };
+        
+        if (data.courseId) {
+          console.log(`Starting background flashcards generation for course ${data.courseId}`);
+          
+          // Process flashcards generation in background
+          EdgeRuntime.waitUntil(
+            processBackgroundFlashcardsGeneration(GEMINI_API_KEY, endpoint, requestBody, data.courseId)
+          );
+          
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Flashcards generation started in background",
+            data: { status: 'generating_flashcards' }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        break;
+
       default:
         throw new Error(`Unsupported action: ${action}`);
     }
@@ -202,7 +244,7 @@ serve(async (req) => {
   }
 });
 
-// Background processing function
+// Background processing function for course generation
 async function processBackgroundCourseGeneration(
   apiKey: string,
   endpoint: string,
@@ -290,6 +332,54 @@ async function processBackgroundCourseGeneration(
       
     console.log(`Course ${courseId} updated with generated content`);
     
+    // After main course generation is complete, start flashcard generation as a separate background process
+    // First, check if the parsed content has flashcards, if not, trigger separate flashcard generation
+    if (!parsedContent.flashcards || parsedContent.flashcards.length < 5) {
+      console.log(`Triggering separate flashcard generation for course ${courseId}`);
+      
+      try {
+        // Get course details to pass to the flashcard generation
+        const { data: courseData, error: courseError } = await supabaseAdmin
+          .from('courses')
+          .select('title, purpose, difficulty')
+          .eq('id', courseId)
+          .single();
+          
+        if (courseError) {
+          throw new Error(`Error fetching course data: ${courseError.message}`);
+        }
+        
+        // Call the same edge function but with flashcard generation action
+        const flashcardResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/gemini-api`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            },
+            body: JSON.stringify({
+              action: 'generate_flashcards',
+              data: {
+                courseId,
+                topic: courseData.title,
+                purpose: courseData.purpose,
+                difficulty: courseData.difficulty
+              }
+            })
+          }
+        );
+        
+        if (!flashcardResponse.ok) {
+          console.error(`Error triggering flashcard generation: ${flashcardResponse.statusText}`);
+        } else {
+          console.log(`Successfully triggered flashcard generation for course ${courseId}`);
+        }
+      } catch (flashcardError) {
+        console.error(`Error triggering flashcard generation: ${flashcardError.message}`);
+      }
+    }
+    
   } catch (error) {
     console.error(`Error in background processing for course ${courseId}:`, error);
     
@@ -315,6 +405,130 @@ async function processBackgroundCourseGeneration(
     } catch (updateError) {
       console.error(`Failed to update error status for course ${courseId}:`, updateError);
     }
+  }
+}
+
+// Background processing function for flashcards generation
+async function processBackgroundFlashcardsGeneration(
+  apiKey: string,
+  endpoint: string,
+  requestBody: any,
+  courseId: string
+) {
+  console.log(`Starting background flashcards generation for course ${courseId}`);
+  
+  try {
+    // Create Supabase admin client for updating the database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
+    
+    // Update status that we're generating flashcards
+    await supabaseAdmin
+      .from('courses')
+      .update({ 
+        content: { 
+          status: 'generating_flashcards', 
+          message: "Generating additional flashcards",
+          lastUpdated: new Date().toISOString() 
+        } 
+      })
+      .eq('id', courseId);
+      
+    // Call Gemini API for flashcards
+    console.log(`Calling Gemini API for flashcards generation for course ${courseId}`);
+    const response = await fetch(`${endpoint}?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Flashcards generation error from Gemini API:', errorData);
+      return;
+    }
+    
+    const responseData = await response.json();
+    console.log(`Flashcards generation completed successfully for course ${courseId}`);
+    
+    // Extract text content
+    const text = responseData.candidates[0].content.parts[0].text;
+    
+    // Parse the flashcards
+    const flashcardsSection = text.match(/# FLASHCARDS\s*\n([\s\S]*?)(?=\n# |$)/i);
+    let flashcards = [];
+    
+    if (flashcardsSection && flashcardsSection[1]) {
+      const flashcardsText = flashcardsSection[1];
+      const flashcardMatches = [...flashcardsText.matchAll(/- Question: ([\s\S]*?)- Answer: ([\s\S]*?)(?=\n- Question: |\n# |\n$)/g)];
+      
+      flashcards = flashcardMatches.map((match) => ({
+        question: match[1].trim(),
+        answer: match[2].trim()
+      }));
+    }
+    
+    if (flashcards.length > 0) {
+      // First get the existing course data
+      const { data: courseData, error: courseError } = await supabaseAdmin
+        .from('courses')
+        .select('content')
+        .eq('id', courseId)
+        .single();
+        
+      if (courseError) {
+        throw new Error(`Error fetching course data: ${courseError.message}`);
+      }
+      
+      // Extract the existing content
+      const content = courseData.content || {};
+      const parsedContent = content.parsedContent || {};
+      
+      // Combine existing flashcards with new ones
+      const existingFlashcards = parsedContent.flashcards || [];
+      const combinedFlashcards = [...existingFlashcards, ...flashcards];
+      
+      // Update the course with the new flashcards
+      await supabaseAdmin
+        .from('courses')
+        .update({ 
+          content: {
+            ...content,
+            status: 'complete',
+            lastUpdated: new Date().toISOString(),
+            parsedContent: {
+              ...parsedContent,
+              flashcards: combinedFlashcards
+            }
+          }
+        })
+        .eq('id', courseId);
+        
+      console.log(`Updated course ${courseId} with ${flashcards.length} additional flashcards`);
+      
+      // Also store flashcards in the flashcards table
+      const flashcardsWithCourseId = flashcards.map(flashcard => ({
+        ...flashcard,
+        course_id: courseId
+      }));
+      
+      const { error: insertError } = await supabaseAdmin
+        .from('flashcards')
+        .insert(flashcardsWithCourseId);
+        
+      if (insertError) {
+        console.error(`Error inserting flashcards into flashcards table: ${insertError.message}`);
+      } else {
+        console.log(`Successfully inserted ${flashcards.length} flashcards into flashcards table`);
+      }
+    }
+    
+  } catch (error) {
+    console.error(`Error in flashcards generation for course ${courseId}:`, error);
   }
 }
 
