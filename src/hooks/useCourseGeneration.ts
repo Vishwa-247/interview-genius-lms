@@ -358,38 +358,8 @@ export const useCourseGeneration = () => {
           
         console.log(`Updated course ${courseId} with ${flashcards.length} additional flashcards`);
         
-        // Create flashcards table if it exists in the schema
-        try {
-          const flashcardsWithCourseId = flashcards.map(flashcard => ({
-            ...flashcard,
-            course_id: courseId
-          }));
-          
-          // Check if the flashcards table exists before inserting
-          const { data: tableInfo } = await supabase
-            .from('flashcards')
-            .select('*')
-            .limit(1)
-            .maybeSingle();
-          
-          // If we can query the table without errors, it exists
-          if (tableInfo !== null || tableInfo === null) {  // Both cases mean the table exists
-            const { error: insertError } = await supabase
-              .from('flashcards')
-              .insert(flashcardsWithCourseId);
-              
-            if (insertError) {
-              console.error(`Error inserting flashcards into flashcards table: ${insertError.message}`);
-            } else {
-              console.log(`Successfully inserted ${flashcards.length} flashcards into flashcards table`);
-            }
-          } else {
-            console.log("Flashcards table does not exist in schema, skipping direct insertion");
-          }
-        } catch (flashcardsTableError) {
-          console.error("Error working with flashcards table:", flashcardsTableError);
-          // Continue execution even if this fails - we already have flashcards in the course content
-        }
+        // We don't need to check for the flashcards table as we're storing them in the course content
+        // This removes the TypeScript error from the code
       }
       
     } catch (error) {
