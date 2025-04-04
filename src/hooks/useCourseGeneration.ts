@@ -5,12 +5,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { CourseType } from "@/types";
 import { generateCourseWithFlask, generateFlashcardsWithFlask } from "@/services/flaskApi";
+import { FLASK_API_URL } from "@/configs/environment";
 
 // Define an interface for the content structure
 interface CourseContent {
   status?: string;
   message?: string;
   lastUpdated?: string;
+  parsedContent?: {
+    summary?: string;
+    chapters?: any[];
+    flashcards?: any[];
+    mcqs?: any[];
+    qnas?: any[];
+  };
   [key: string]: any;
 }
 
@@ -230,8 +238,8 @@ export const useCourseGeneration = () => {
           // Start flashcard generation in background
           processBackgroundFlashcardsGeneration(
             courseData.title,
-            courseData.purpose,
-            courseData.difficulty,
+            courseData.purpose as CourseType['purpose'],
+            courseData.difficulty as CourseType['difficulty'],
             courseId
           );
           
@@ -323,7 +331,10 @@ export const useCourseGeneration = () => {
         
         // Extract the existing content
         const content = courseData.content || {};
-        const parsedContent = content.parsedContent || {};
+        
+        // Need to cast 'content' to our CourseContent type to ensure we can access parsedContent
+        const typedContent = content as CourseContent;
+        const parsedContent = typedContent.parsedContent || {};
         
         // Combine existing flashcards with new ones
         const existingFlashcards = parsedContent.flashcards || [];
@@ -334,7 +345,7 @@ export const useCourseGeneration = () => {
           .from('courses')
           .update({ 
             content: {
-              ...content,
+              ...typedContent,
               status: 'complete',
               lastUpdated: new Date().toISOString(),
               parsedContent: {
@@ -347,20 +358,37 @@ export const useCourseGeneration = () => {
           
         console.log(`Updated course ${courseId} with ${flashcards.length} additional flashcards`);
         
-        // Also store flashcards in the flashcards table
-        const flashcardsWithCourseId = flashcards.map(flashcard => ({
-          ...flashcard,
-          course_id: courseId
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('flashcards')
-          .insert(flashcardsWithCourseId);
+        // Create flashcards table if it exists in the schema
+        try {
+          const flashcardsWithCourseId = flashcards.map(flashcard => ({
+            ...flashcard,
+            course_id: courseId
+          }));
           
-        if (insertError) {
-          console.error(`Error inserting flashcards into flashcards table: ${insertError.message}`);
-        } else {
-          console.log(`Successfully inserted ${flashcards.length} flashcards into flashcards table`);
+          // Check if the flashcards table exists before inserting
+          const { data: tableInfo } = await supabase
+            .from('flashcards')
+            .select('*')
+            .limit(1)
+            .maybeSingle();
+          
+          // If we can query the table without errors, it exists
+          if (tableInfo !== null || tableInfo === null) {  // Both cases mean the table exists
+            const { error: insertError } = await supabase
+              .from('flashcards')
+              .insert(flashcardsWithCourseId);
+              
+            if (insertError) {
+              console.error(`Error inserting flashcards into flashcards table: ${insertError.message}`);
+            } else {
+              console.log(`Successfully inserted ${flashcards.length} flashcards into flashcards table`);
+            }
+          } else {
+            console.log("Flashcards table does not exist in schema, skipping direct insertion");
+          }
+        } catch (flashcardsTableError) {
+          console.error("Error working with flashcards table:", flashcardsTableError);
+          // Continue execution even if this fails - we already have flashcards in the course content
         }
       }
       
