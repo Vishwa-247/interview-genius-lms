@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -19,4 +20,9 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    // Provide default values for environment variables
+    'import.meta.env.VITE_FLASK_API_URL': JSON.stringify(process.env.VITE_FLASK_API_URL || "http://localhost:5000"),
+    'import.meta.env.VITE_ENABLE_ANALYTICS': JSON.stringify(process.env.VITE_ENABLE_ANALYTICS || "false"),
+  }
 }));

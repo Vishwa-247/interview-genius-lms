@@ -19,8 +19,8 @@ const callFlaskApi = async <T>(endpoint: string, data: any): Promise<T> => {
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Flask API error: ${response.status} ${errorData}`);
+      const errorText = await response.text();
+      throw new Error(`Flask API error: ${response.status} ${errorText}`);
     }
 
     const responseData = await response.json();
@@ -86,7 +86,7 @@ export const generateFlashcardsWithFlask = async (
                   Each answer should be detailed enough to provide complete understanding.
                   Ensure varying difficulty levels across the flashcards to test different aspects of knowledge.`;
 
-  return callFlaskApi('/generate', {
+  return callFlaskApi<string>('/generate', {
     action: 'custom_content',
     prompt
   });
@@ -96,7 +96,7 @@ export const generateFlashcardsWithFlask = async (
  * Summarize text using the Flask API
  */
 export const summarizeTextWithFlask = async (text: string) => {
-  return callFlaskApi('/generate', {
+  return callFlaskApi<string>('/generate', {
     action: 'summarize_text',
     text
   });
@@ -106,7 +106,7 @@ export const summarizeTextWithFlask = async (text: string) => {
  * Explain code using the Flask API
  */
 export const explainCodeWithFlask = async (code: string) => {
-  return callFlaskApi('/generate', {
+  return callFlaskApi<string>('/generate', {
     action: 'explain_code',
     code
   });
