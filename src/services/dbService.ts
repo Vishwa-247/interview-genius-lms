@@ -18,10 +18,19 @@ import {
 // Helper function to create UUID
 const generateUuid = () => uuidv4();
 
-// Current user handling (replace with your auth solution)
+// Helper function to format Date objects to strings
+const formatDate = (date: Date): string => {
+  return date.toISOString();
+};
+
+// Current user handling
 const getCurrentUserId = async (): Promise<string> => {
-  // Replace this with your new auth solution
-  // This is a placeholder - you'll need to implement your actual auth logic
+  // Get user from localStorage
+  const storedUser = localStorage.getItem('user');
+  if (storedUser) {
+    const user = JSON.parse(storedUser);
+    return user.id;
+  }
   return "placeholder-user-id";
 };
 
@@ -33,6 +42,7 @@ export const createMockInterview = async (
 ): Promise<MockInterviewType> => {
   const userId = await getCurrentUserId();
   const id = generateUuid();
+  const now = new Date();
   
   const interview = {
     id,
@@ -41,12 +51,15 @@ export const createMockInterview = async (
     tech_stack: techStack,
     experience,
     completed: false,
-    created_at: new Date()
+    created_at: now
   };
   
   await db.insert(schema.mockInterviews).values(interview);
   
-  return interview;
+  return {
+    ...interview,
+    created_at: formatDate(now)
+  };
 };
 
 export const getUserMockInterviews = async (): Promise<MockInterviewType[]> => {
@@ -58,7 +71,10 @@ export const getUserMockInterviews = async (): Promise<MockInterviewType[]> => {
     .where(eq(schema.mockInterviews.user_id, userId))
     .orderBy(schema.mockInterviews.created_at);
     
-  return interviews;
+  return interviews.map(interview => ({
+    ...interview,
+    created_at: formatDate(interview.created_at as unknown as Date)
+  }));
 };
 
 export const getMockInterviewById = async (interviewId: string): Promise<MockInterviewType> => {
@@ -72,7 +88,10 @@ export const getMockInterviewById = async (interviewId: string): Promise<MockInt
     throw new Error(`Interview not found with id: ${interviewId}`);
   }
   
-  return interview;
+  return {
+    ...interview,
+    created_at: formatDate(interview.created_at as unknown as Date)
+  };
 };
 
 export const updateMockInterviewCompleted = async (interviewId: string): Promise<void> => {
@@ -90,18 +109,22 @@ export const createInterviewQuestions = async (
     order_number: number;
   }[]
 ): Promise<InterviewQuestionType[]> => {
+  const now = new Date();
   const interviewQuestionsToInsert = questions.map(q => ({
     id: generateUuid(),
     interview_id: interviewId,
     question: q.question,
     order_number: q.order_number,
     user_answer: null,
-    created_at: new Date()
+    created_at: now
   }));
   
   await db.insert(schema.interviewQuestions).values(interviewQuestionsToInsert);
   
-  return interviewQuestionsToInsert;
+  return interviewQuestionsToInsert.map(q => ({
+    ...q,
+    created_at: formatDate(now)
+  }));
 };
 
 export const getInterviewQuestionsByInterviewId = async (interviewId: string): Promise<InterviewQuestionType[]> => {
@@ -111,7 +134,10 @@ export const getInterviewQuestionsByInterviewId = async (interviewId: string): P
     .where(eq(schema.interviewQuestions.interview_id, interviewId))
     .orderBy(schema.interviewQuestions.order_number);
     
-  return questions;
+  return questions.map(question => ({
+    ...question,
+    created_at: formatDate(question.created_at as unknown as Date)
+  }));
 };
 
 export const updateInterviewQuestionAnswer = async (questionId: string, answer: string): Promise<void> => {
@@ -140,7 +166,8 @@ export const createInterviewAnalysis = async (
     link?: string;
   }[]
 ): Promise<InterviewAnalysisType> => {
-  const analysis = {
+  const now = new Date();
+  const analysisData = {
     id: generateUuid(),
     interview_id: interviewId,
     facial_data: facialExpressionData,
@@ -148,12 +175,15 @@ export const createInterviewAnalysis = async (
     technical_feedback: technicalFeedback,
     language_feedback: languageFeedback,
     recommendations: courseRecommendations,
-    created_at: new Date()
+    created_at: now
   };
   
-  await db.insert(schema.interviewAnalysis).values(analysis);
+  await db.insert(schema.interviewAnalysis).values(analysisData);
   
-  return analysis;
+  return {
+    ...analysisData,
+    created_at: formatDate(now)
+  };
 };
 
 export const getInterviewAnalysisByInterviewId = async (interviewId: string): Promise<InterviewAnalysisType> => {
@@ -167,7 +197,10 @@ export const getInterviewAnalysisByInterviewId = async (interviewId: string): Pr
     throw new Error(`Analysis not found for interview with id: ${interviewId}`);
   }
   
-  return analysis;
+  return {
+    ...analysis,
+    created_at: formatDate(analysis.created_at as unknown as Date)
+  };
 };
 
 // We'll implement the course and flashcard methods when you provide the LMS schema

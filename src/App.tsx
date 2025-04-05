@@ -27,9 +27,9 @@ const queryClient = new QueryClient({
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth(); // Changed from isLoading to loading
   
-  if (isLoading) {
+  if (loading) {
     return <Layout><div className="flex items-center justify-center h-[70vh]">Loading...</div></Layout>;
   }
   

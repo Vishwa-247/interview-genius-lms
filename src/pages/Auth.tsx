@@ -41,7 +41,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function Auth() {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
-  const { signIn, signUp, user, isLoading } = useAuth();
+  const { signIn, signUp, user, loading } = useAuth(); // Changed isLoading to loading
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -74,7 +74,8 @@ export default function Auth() {
 
   const onSignupSubmit = async (values: SignupFormValues) => {
     try {
-      await signUp(values.email, values.password, values.fullName);
+      // Only pass the required parameters to signUp
+      await signUp(values.email, values.password);
       toast({
         title: "Verification email sent!",
         description: "Please check your email to verify your account.",
@@ -135,8 +136,8 @@ export default function Auth() {
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? "Signing in..." : "Sign In"}
+                      <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? "Signing in..." : "Sign In"}
                       </Button>
                     </form>
                   </Form>
@@ -205,8 +206,8 @@ export default function Auth() {
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? "Creating account..." : "Create Account"}
+                      <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? "Creating account..." : "Create Account"}
                       </Button>
                     </form>
                   </Form>

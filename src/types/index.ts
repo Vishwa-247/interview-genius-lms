@@ -1,3 +1,4 @@
+
 export type CourseType = {
   id: string;
   user_id: string;

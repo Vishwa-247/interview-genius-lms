@@ -1,17 +1,17 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// You'll need to replace this with your new auth provider
-// This is just a placeholder structure that mimics the original behavior
 
 interface User {
   id: string;
   email: string;
+  name?: string;
+  // Add other user properties here
 }
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
+  loading: boolean; // Changed from isLoading to loading to match usage in the component
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Changed from isLoading to loading
   const navigate = useNavigate();
 
   // Check for existing session on mount
