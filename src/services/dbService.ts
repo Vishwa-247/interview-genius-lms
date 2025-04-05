@@ -54,7 +54,15 @@ export const createMockInterview = async (
     created_at: now
   };
   
-  await db.insert(schema.mockInterviews).values(interview);
+  await db.insert(schema.mockInterviews).values({
+    id,
+    user_id: userId,
+    job_role: jobRole,
+    tech_stack: techStack,
+    experience,
+    completed: false,
+    // created_at is managed by defaultNow()
+  });
   
   return {
     ...interview,
@@ -116,10 +124,18 @@ export const createInterviewQuestions = async (
     question: q.question,
     order_number: q.order_number,
     user_answer: null,
-    created_at: now
+    // created_at is managed by defaultNow()
   }));
   
-  await db.insert(schema.interviewQuestions).values(interviewQuestionsToInsert);
+  // Remove the user_answer field if it's null to prevent errors
+  const questionsToInsert = interviewQuestionsToInsert.map(({ user_answer, ...rest }) => {
+    if (user_answer !== null) {
+      return { ...rest, user_answer };
+    }
+    return rest;
+  });
+  
+  await db.insert(schema.interviewQuestions).values(questionsToInsert);
   
   return interviewQuestionsToInsert.map(q => ({
     ...q,
@@ -167,21 +183,27 @@ export const createInterviewAnalysis = async (
   }[]
 ): Promise<InterviewAnalysisType> => {
   const now = new Date();
-  const analysisData = {
-    id: generateUuid(),
+  const id = generateUuid();
+  
+  await db.insert(schema.interviewAnalysis).values({
+    id,
     interview_id: interviewId,
     facial_data: facialExpressionData,
     pronunciation_feedback: pronunciationFeedback,
     technical_feedback: technicalFeedback,
     language_feedback: languageFeedback,
     recommendations: courseRecommendations,
-    created_at: now
-  };
-  
-  await db.insert(schema.interviewAnalysis).values(analysisData);
+    // created_at is managed by defaultNow()
+  });
   
   return {
-    ...analysisData,
+    id,
+    interview_id: interviewId,
+    facial_data: facialExpressionData,
+    pronunciation_feedback: pronunciationFeedback,
+    technical_feedback: technicalFeedback,
+    language_feedback: languageFeedback,
+    recommendations: courseRecommendations,
     created_at: formatDate(now)
   };
 };
@@ -197,8 +219,25 @@ export const getInterviewAnalysisByInterviewId = async (interviewId: string): Pr
     throw new Error(`Analysis not found for interview with id: ${interviewId}`);
   }
   
+  // Ensure facial_data and recommendations conform to expected types
+  const typedFacialData = analysis.facial_data as {
+    confident: number;
+    stressed: number;
+    hesitant: number;
+    nervous: number;
+    excited: number;
+  };
+  
+  const typedRecommendations = analysis.recommendations as {
+    title: string;
+    description: string;
+    link?: string;
+  }[];
+  
   return {
     ...analysis,
+    facial_data: typedFacialData,
+    recommendations: typedRecommendations,
     created_at: formatDate(analysis.created_at as unknown as Date)
   };
 };

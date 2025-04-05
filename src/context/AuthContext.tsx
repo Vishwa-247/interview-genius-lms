@@ -1,21 +1,24 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: string;
-  email: string;
-  name?: string;
-  // Add other user properties here
+  email?: string;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+    avatar_url?: string;
+    email?: string;
+  };
+  // Add any other properties needed
 }
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean; // Changed from isLoading to loading to match usage in the component
+  loading: boolean; // Changed from isLoading to loading for consistency
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
-  isAuthenticated: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,11 +63,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
       // Replace with your new auth provider's sign up method
       // Mocking successful sign up for placeholder
-      const mockUser = { id: 'new-user-id', email };
+      const mockUser = { id: 'new-user-id', email, user_metadata: { name } };
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
     } catch (error) {

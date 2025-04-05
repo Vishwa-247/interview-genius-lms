@@ -53,5 +53,3 @@ export const userAnswers = pgTable("user_answers", {
   userEmail: varchar("userEmail"),
   createdAt: varchar("createdAt"),
 });
-
-// We'll add LMS schemas when you provide them
