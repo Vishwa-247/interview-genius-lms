@@ -16,15 +16,20 @@ interface GeminiResponse {
  */
 const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
   try {
+    console.log(`Calling Gemini API via Edge Function: ${action}`, data);
+    
     // Call the Supabase Edge Function
     const { data: responseData, error } = await supabase.functions.invoke('gemini-api', {
       body: { action, data },
     });
 
     if (error) {
+      console.error(`Supabase Edge Function error: ${error.message}`, error);
       throw new Error(`Supabase Edge Function error: ${error.message}`);
     }
 
+    console.log(`Received response from Gemini API: ${action}`, responseData);
+    
     if (!responseData.success) {
       throw new Error(responseData.error || 'Unknown error from Gemini API');
     }
