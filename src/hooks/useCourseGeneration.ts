@@ -146,7 +146,7 @@ export const useCourseGeneration = () => {
       setGenerationInBackground(true);
       setError(null);
 
-      // Start the background process using Gemini API through the edge function
+      // Start the background process using Flask API for Gemini
       processBackgroundCourseGeneration(
         courseName,
         purpose,
@@ -161,7 +161,7 @@ export const useCourseGeneration = () => {
     }
   };
 
-  // Background processing function to handle course generation with Gemini API
+  // Background processing function to handle course generation with Flask API for Gemini
   const processBackgroundCourseGeneration = async (
     topic: string,
     purpose: CourseType['purpose'],
@@ -179,8 +179,8 @@ export const useCourseGeneration = () => {
         
       console.log(`Updated course ${courseId} status to generating`);
 
-      // Call Gemini API via Supabase Edge Function
-      console.log(`Calling Gemini API for course ${courseId}`);
+      // Call Flask API for Gemini
+      console.log(`Calling Flask API for course ${courseId}`);
       
       try {
         const response = await generateCourseWithGemini(courseId, topic, purpose, difficulty);
@@ -228,7 +228,7 @@ export const useCourseGeneration = () => {
           
         console.log(`Course ${courseId} updated with generated content`);
       } catch (error: any) {
-        console.error(`Error calling Gemini API: ${error.message}`);
+        console.error(`Error calling Flask API for Gemini: ${error.message}`);
         throw error;
       }
       

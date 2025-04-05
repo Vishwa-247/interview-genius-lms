@@ -44,12 +44,44 @@ Generates content based on the specified action.
 }
 ```
 
+### POST /gemini
+Direct interface to Gemini API, used by the frontend geminiService.ts.
+
+**Request Body**:
+```json
+{
+  "action": "one of: generate_course, generate_interview_questions, analyze_interview, generate_flashcards",
+  "data": {
+    "courseId": "ID for the course (for generate_course, generate_flashcards)",
+    "topic": "Course topic (for generate_course, generate_flashcards)",
+    "purpose": "Course purpose (for generate_course, generate_flashcards)",
+    "difficulty": "Difficulty level (for generate_course, generate_flashcards)",
+    "jobRole": "Job role (for generate_interview_questions, analyze_interview)",
+    "techStack": "Technology stack (for generate_interview_questions)",
+    "experience": "Years of experience (for generate_interview_questions)",
+    "question": "Interview question (for analyze_interview)",
+    "answer": "User answer (for analyze_interview)",
+    "questionCount": "Number of questions (optional, for generate_interview_questions)"
+  }
+}
+```
+
 **Response**:
 ```json
 {
   "success": true,
   "data": {
-    // AI-generated content
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Generated content from Gemini API"
+            }
+          ]
+        }
+      }
+    ]
   }
 }
 ```
@@ -59,3 +91,5 @@ Generates content based on the specified action.
 - The API requires CORS to be enabled to work with web clients.
 - In production, always secure your API with proper authentication.
 - The Gemini API has rate limits and token usage limits.
+- Set the `GEMINI_API_KEY` environment variable to your Google Gemini API key.
+

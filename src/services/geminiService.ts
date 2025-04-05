@@ -1,8 +1,9 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { FLASK_API_URL } from '@/configs/environment';
 
 /**
- * Service for interacting with the Gemini API via Supabase Edge Functions
+ * Service for interacting with the Gemini API via Flask API
+ * This redirects all calls intended for Gemini to the Flask backend
  */
 
 interface GeminiResponse {
@@ -12,32 +13,40 @@ interface GeminiResponse {
 }
 
 /**
- * Makes a call to the Gemini API via Supabase Edge Functions
+ * Makes a call to the Gemini API via Flask API
  */
 const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
   try {
-    console.log(`Calling Gemini API via Edge Function: ${action}`, data);
+    console.log(`Calling Gemini API via Flask API: ${action}`, data);
     
-    // Call the Supabase Edge Function
-    const { data: responseData, error } = await supabase.functions.invoke('gemini-api', {
-      body: { action, data },
+    // Call the Flask API instead of Supabase Edge Functions
+    const response = await fetch(`${FLASK_API_URL}/gemini`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, data }),
     });
 
-    if (error) {
-      console.error(`Supabase Edge Function error: ${error.message}`, error);
-      throw new Error(`Supabase Edge Function error: ${error.message}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Flask API error: ${response.status} ${errorText}`);
+      throw new Error(`Flask API error: ${response.status} ${errorText}`);
     }
 
-    console.log(`Received response from Gemini API: ${action}`, responseData);
+    const responseData = await response.json();
+    console.log(`Received response from Gemini API via Flask: ${action}`, responseData);
     
-    if (!responseData.success) {
-      throw new Error(responseData.error || 'Unknown error from Gemini API');
-    }
-
-    return responseData.data as T;
+    return {
+      success: true,
+      data: responseData.data
+    } as unknown as T;
   } catch (error: any) {
     console.error(`Error calling Gemini API (${action}):`, error);
-    throw error;
+    return {
+      success: false,
+      error: error.message || 'Unknown error from Gemini API'
+    } as unknown as T;
   }
 };
 
