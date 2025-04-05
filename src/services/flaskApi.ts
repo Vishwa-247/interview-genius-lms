@@ -1,5 +1,5 @@
 
-import { FLASK_API_URL } from "@/configs/environment";
+import { FLASK_API_URL, GEMINI_API_KEY } from "@/configs/environment";
 
 /**
  * Service for communicating with the Flask API for generation tasks

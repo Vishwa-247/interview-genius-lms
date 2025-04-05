@@ -7,6 +7,12 @@ import {
   summarizeTextWithFlask,
   explainCodeWithFlask
 } from './flaskApi';
+import {
+  generateCourseWithGemini,
+  generateInterviewQuestionsWithGemini,
+  analyzeInterviewResponseWithGemini,
+  generateFlashcardsWithGemini
+} from './geminiService';
 
 const fromTable = <T>(tableName: string) => {
   return (supabase as any).from(tableName);
@@ -398,73 +404,67 @@ export const analyzeFacialExpression = async (
   };
 };
 
-export const generateCourseWithGemini = async (
-  topic: string,
-  purpose: CourseType['purpose'],
-  difficulty: CourseType['difficulty']
-) => {
-  return generateCourseWithFlask(topic, purpose, difficulty);
-};
-
+/**
+ * Generate a course using the Gemini API
+ */
 export const generateCourseContent = async (
+  courseId: string,
   topic: string, 
   purpose: CourseType['purpose'], 
   difficulty: CourseType['difficulty']
 ) => {
-  return generateCourseWithFlask(topic, purpose, difficulty);
+  try {
+    return await generateCourseWithGemini(courseId, topic, purpose, difficulty);
+  } catch (error) {
+    console.error("Error generating course with Gemini:", error);
+    // Fallback to Flask API if Gemini fails
+    return generateCourseWithFlask(topic, purpose, difficulty);
+  }
 };
 
+/**
+ * Generate interview questions using the Gemini API
+ */
 export const generateInterviewQuestions = async (
   jobRole: string,
   techStack: string,
   experience: string,
   questionCount: number = 5
 ) => {
-  return generateInterviewQuestionsWithFlask(jobRole, techStack, experience, questionCount);
+  try {
+    return await generateInterviewQuestionsWithGemini(jobRole, techStack, experience, questionCount);
+  } catch (error) {
+    console.error("Error generating interview questions with Gemini:", error);
+    // Fallback to Flask API if Gemini fails
+    return generateInterviewQuestionsWithFlask(jobRole, techStack, experience, questionCount);
+  }
 };
 
+/**
+ * Analyze an interview response using the Gemini API
+ */
 export const analyzeInterviewResponse = async (
   jobRole: string,
   question: string,
   answer: string
 ) => {
   try {
-    const prompt = `Analyze this interview response for a ${jobRole} position. 
-                     Question: ${question}
-                     Answer: ${answer}
-                     
-                     Provide detailed analysis in the following format:
-                     
-                     Technical Feedback: (Analyze understanding of technical concepts and accuracy)
-                     Communication Feedback: (Analyze clarity, structure, and language used)
-                     Strengths: (List 3 specific strengths in the response)
-                     Areas to Improve: (List 3 specific areas that could be improved)
-                     Overall Rating: (Give a rating between 0-100)`;
-
-    const response = await fetch(`http://localhost:5000/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'custom_content',
-        prompt
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Flask API error: ${response.status} ${errorData}`);
-    }
-
-    const data = await response.json();
-    return data.data;
+    return await analyzeInterviewResponseWithGemini(jobRole, question, answer);
   } catch (error) {
-    console.error("Error analyzing interview response:", error);
-    throw error;
+    console.error("Error analyzing interview response with Gemini:", error);
+    
+    // Fallback to a simple response if Gemini fails
+    return {
+      data: {
+        text: "An error occurred while analyzing the response. Please try again later."
+      }
+    };
   }
 };
 
+/**
+ * Start course generation process using Supabase edge function
+ */
 export const startCourseGeneration = async (
   courseId: string,
   topic: string, 
@@ -472,6 +472,8 @@ export const startCourseGeneration = async (
   difficulty: CourseType['difficulty']
 ): Promise<void> => {
   try {
+    // Call the Gemini API to generate course content
+    await generateCourseWithGemini(courseId, topic, purpose, difficulty);
     console.log("Course generation started for:", {courseId, topic, purpose, difficulty});
     return;
   } catch (error) {

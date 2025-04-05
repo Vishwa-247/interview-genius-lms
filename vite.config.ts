@@ -24,5 +24,6 @@ export default defineConfig(({ mode }) => ({
     // Provide default values for environment variables
     'import.meta.env.VITE_FLASK_API_URL': JSON.stringify(process.env.VITE_FLASK_API_URL || "http://localhost:5000"),
     'import.meta.env.VITE_ENABLE_ANALYTICS': JSON.stringify(process.env.VITE_ENABLE_ANALYTICS || "false"),
+    'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(process.env.VITE_GEMINI_API_KEY || ""),
   }
 }));
