@@ -1,118 +1,236 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
-interface User {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    full_name?: string;
-    name?: string;
-    avatar_url?: string;
-    email?: string;
-  };
-  // Add any other properties needed
-}
-
 interface AuthContextType {
+  session: Session | null;
   user: User | null;
-  loading: boolean; // Changed from isLoading to loading for consistency
+  isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  syncUserProfile: (userId: string, fullName: string, email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true); // Changed from isLoading to loading
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  // useNavigate hook is now safely used inside the Router context
   const navigate = useNavigate();
 
-  // Check for existing session on mount
+  // Function to sync user data with our users table
+  const syncUserProfile = async (userId: string, fullName: string, email: string) => {
+    try {
+      console.log("Syncing user profile:", { userId, fullName, email });
+      
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          id: userId,
+          name: fullName,
+          email: email
+        }, {
+          onConflict: 'id'
+        });
+      
+      if (error) {
+        console.error("Error syncing user profile:", error);
+        throw error;
+      }
+      
+      console.log("User profile synced successfully");
+    } catch (error: any) {
+      console.error("Error syncing user profile:", error.message);
+      toast({
+        title: "Profile sync error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
-    const checkSession = async () => {
+    let mounted = true;
+    
+    async function initializeAuth() {
       try {
-        // Replace this with your new auth solution's session check
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+        // Set loading state
+        if (mounted) setIsLoading(true);
+        
+        // Get initial session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // Sync user profile if session exists
+          if (session?.user) {
+            const { id, email, user_metadata } = session.user;
+            const fullName = user_metadata?.full_name || '';
+            
+            if (id && email) {
+              await syncUserProfile(id, fullName, email);
+            }
+          }
         }
       } catch (error) {
-        console.error("Error checking authentication:", error);
-        // On any auth error, clear user data for security
-        setUser(null);
-        localStorage.removeItem('user');
+        console.error("Auth initialization error:", error);
       } finally {
-        setLoading(false);
+        if (mounted) setIsLoading(false);
       }
-    };
+    }
+    
+    // Initialize auth
+    initializeAuth();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // Sync user profile if session exists
+          if (session?.user) {
+            const { id, email, user_metadata } = session.user;
+            const fullName = user_metadata?.full_name || '';
+            
+            if (id && email) {
+              await syncUserProfile(id, fullName, email);
+            }
+          }
+        }
+      }
+    );
 
-    checkSession();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Replace with your new auth provider's sign in method
-      // Mocking successful sign in for placeholder
-      const mockUser = { id: 'user-id', email };
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-    } catch (error) {
-      console.error("Error signing in:", error);
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in."
+      });
+      
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: "Error signing in",
+        description: error.message,
+        variant: "destructive"
+      });
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      // Replace with your new auth provider's sign up method
-      // Mocking successful sign up for placeholder
-      const mockUser = { id: 'new-user-id', email, user_metadata: { name } };
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-    } catch (error) {
-      console.error("Error signing up:", error);
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: 'user',
+          },
+        },
+      });
+      
+      if (error) throw error;
+      
+      // If sign up is successful and we have a user, sync with our users table
+      if (data?.user) {
+        await syncUserProfile(data.user.id, fullName, email);
+      }
+      
+      toast({
+        title: "Account created!",
+        description: "Check your email for the confirmation link."
+      });
+      
+      // Redirect to dashboard if email confirmation is not required
+      // Otherwise, stay on the current page with a message to check email
+      if (data?.session) {
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error creating account",
+        description: error.message,
+        variant: "destructive"
+      });
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signOut = async () => {
     try {
-      // Replace with your new auth provider's sign out method
+      setIsLoading(true);
+      
+      // First clear local state
       setUser(null);
-      localStorage.removeItem('user');
+      setSession(null);
       
-      // Enhanced logout - force navigation to auth page
-      navigate('/auth', { replace: true });
+      // Then call supabase signOut
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       
-      // Clear any other stored data that might be user-specific
-      sessionStorage.clear();
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully."
+      });
       
-      // Safety measure: reload the page to clear any in-memory state
-      // This ensures no protected routes can be accessed after logout
-      window.location.reload();
-    } catch (error) {
-      console.error("Error signing out:", error);
-      // Force navigation to auth page even on error
-      navigate('/auth', { replace: true });
+      // Force navigation to home page
+      window.location.href = "/";
+    } catch (error: any) {
+      toast({
+        title: "Error signing out",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const isAuthenticated = () => {
-    return !!user;
+  const value = {
+    session,
+    user,
+    isLoading,
+    signIn,
+    signUp,
+    signOut,
+    syncUserProfile
   };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, isAuthenticated }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
