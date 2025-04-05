@@ -1,7 +1,7 @@
 
 # StudyMate - AI Learning and Interview Practice Platform
 
-StudyMate is an AI-powered platform for personalized learning and interview practice. Generate custom study materials and practice job interviews with AI feedback.
+StudyMate is an AI-powered platform for personalized learning and interview practice. Generate custom study materials and practice job interviews with AI feedback. 
 
 ## Technologies Used
 
