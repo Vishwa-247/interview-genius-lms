@@ -86,7 +86,7 @@ def generate():
 
             return jsonify({
                 "success": True, 
-                "text": response_text
+                "text": response_text  # Return the text property explicitly
             }), 200
             
         except Exception as e:

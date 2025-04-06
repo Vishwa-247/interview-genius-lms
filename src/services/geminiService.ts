@@ -9,6 +9,7 @@ interface GeminiResponse {
   success: boolean;
   data?: any;
   error?: string;
+  text?: string; // Added text property to fix TypeScript error
 }
 
 /**
