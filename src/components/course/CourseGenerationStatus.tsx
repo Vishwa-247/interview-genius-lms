@@ -24,7 +24,7 @@ const CourseGenerationStatus = ({
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   
   useEffect(() => {
-    if (status === 'generating' && startTime) {
+    if ((status === 'generating' || status === 'generating_flashcards') && startTime) {
       const startDate = new Date(startTime);
       const interval = setInterval(() => {
         const seconds = Math.floor((new Date().getTime() - startDate.getTime()) / 1000);
