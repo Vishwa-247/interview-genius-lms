@@ -1,9 +1,13 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { CourseType } from "@/types";
-import { generateCourseWithGemini } from "@/services/geminiService";
+import { 
+  generateCourseWithGemini, 
+  generateCourseFallback 
+} from "@/services/geminiService";
 
 // Define an interface for the content structure
 interface CourseContent {
@@ -26,6 +30,8 @@ export const useCourseGeneration = () => {
   const [courseGenerationId, setCourseGenerationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [useFallback, setUseFallback] = useState(false);
 
   useEffect(() => {
     let intervalId: number | null = null;
@@ -129,6 +135,8 @@ export const useCourseGeneration = () => {
       
       // Reset progress
       setProgress(10);
+      setRetryCount(0);
+      setUseFallback(false);
       
       // Step 1: Create an empty course entry
       const { data: emptyCourse, error: courseError } = await supabase
@@ -196,9 +204,38 @@ export const useCourseGeneration = () => {
       console.log(`Calling Flask API for course ${courseId}`);
       
       try {
-        const response = await generateCourseWithGemini(courseId, topic, purpose, difficulty);
+        const response = useFallback 
+          ? await generateCourseFallback(topic, purpose, difficulty)
+          : await generateCourseWithGemini(courseId, topic, purpose, difficulty);
         
         if (!response.success) {
+          // If API call failed but retries are available, try again after a short delay
+          if (retryCount < 2 && !useFallback) {
+            setRetryCount(prev => prev + 1);
+            console.log(`API call failed, retrying (${retryCount + 1}/3)...`);
+            
+            // Update progress to indicate retry
+            setProgress(35);
+            
+            // Wait 3 seconds before retry
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Try again recursively
+            return processBackgroundCourseGeneration(topic, purpose, difficulty, courseId);
+          }
+          
+          // If we've exhausted retries, switch to fallback mode
+          if (!useFallback) {
+            console.log("Switching to fallback generation mode");
+            setUseFallback(true);
+            
+            // Update progress to indicate fallback
+            setProgress(40);
+            
+            // Try again with fallback
+            return processBackgroundCourseGeneration(topic, purpose, difficulty, courseId);
+          }
+          
           throw new Error(response.error || 'Unknown error from Gemini API');
         }
         

@@ -13,12 +13,16 @@ import { toast as sonnerToast } from "sonner";
 import { useCourseGeneration } from "@/hooks/useCourseGeneration";
 import { CourseType } from "@/types";
 import { useMutation } from "@tanstack/react-query";
+import { Clock, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const CourseGenerator = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [generationStartTime, setGenerationStartTime] = useState<Date | null>(null);
+  const [estimatedTime, setEstimatedTime] = useState<number>(60); // Default 60 seconds
   
   const { 
     generationInBackground, 
@@ -27,6 +31,22 @@ const CourseGenerator = () => {
     setError, 
     startCourseGeneration 
   } = useCourseGeneration();
+
+  // Calculate remaining time
+  const getRemainingTime = () => {
+    if (!generationStartTime) return 0;
+    
+    const elapsed = Math.floor((Date.now() - generationStartTime.getTime()) / 1000);
+    const remaining = Math.max(0, estimatedTime - elapsed);
+    return remaining;
+  };
+
+  // Format time in minutes and seconds
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   // Use React Query for mutations to manage loading and error states automatically
   const generateCourseMutation = useMutation({
@@ -42,6 +62,19 @@ const CourseGenerator = () => {
       if (!user) {
         throw new Error("Authentication required");
       }
+      
+      // Start the timer when generation begins
+      setGenerationStartTime(new Date());
+      
+      // Set estimated time based on complexity
+      if (difficulty === 'advanced') {
+        setEstimatedTime(120); // 2 minutes for advanced courses
+      } else if (difficulty === 'intermediate') {
+        setEstimatedTime(90); // 1.5 minutes for intermediate courses
+      } else {
+        setEstimatedTime(60); // 1 minute for beginner courses
+      }
+      
       return startCourseGeneration(courseName, purpose, difficulty, user.id);
     },
     onSuccess: () => {
@@ -91,6 +124,8 @@ const CourseGenerator = () => {
     generateCourseMutation.mutate({ courseName, purpose, difficulty });
   };
 
+  const remainingTime = getRemainingTime();
+
   return (
     <Container className="py-12">
       <div className="mb-8">
@@ -108,11 +143,31 @@ const CourseGenerator = () => {
       )}
 
       {generationInBackground && (
-        <div className="mb-8">
-          <p className="text-sm font-medium mb-2">Generating your course...</p>
-          <Progress value={progress} className="h-2 mb-2" />
-          <p className="text-xs text-muted-foreground">{progress}% complete</p>
-        </div>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating your course...
+            </CardTitle>
+            <CardDescription>
+              This process takes approximately {formatTime(estimatedTime)} to complete.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Progress value={progress} className="h-2" />
+              <div className="flex items-center justify-between text-sm">
+                <span>{progress}% complete</span>
+                {remainingTime > 0 && (
+                  <div className="flex items-center text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5 mr-1" />
+                    <span>Estimated {formatTime(remainingTime)} remaining</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

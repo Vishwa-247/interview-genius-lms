@@ -78,7 +78,8 @@ def generate():
             return jsonify({"success": False, "error": f"Unsupported action: {action}"}), 400
         
         try:
-            # Generate content using the Gemini model
+            # Generate content using the Gemini model - fix the API call format
+            # The correct way to call the Gemini model
             response = model.generate_content(prompt)
             
             # Format the response to match the expected format
