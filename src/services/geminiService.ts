@@ -3,7 +3,6 @@ import { FLASK_API_URL } from '@/configs/environment';
 
 /**
  * Service for interacting with the Gemini API via Flask API
- * This redirects all calls intended for Gemini to the Flask backend
  */
 
 interface GeminiResponse {
@@ -19,8 +18,7 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
   try {
     console.log(`Calling Gemini API via Flask API: ${action}`, data);
     
-    // Call the Flask API instead of Supabase Edge Functions
-    const response = await fetch(`${FLASK_API_URL}/gemini`, {
+    const response = await fetch(`${FLASK_API_URL}/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -37,10 +35,7 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
     const responseData = await response.json();
     console.log(`Received response from Gemini API via Flask: ${action}`, responseData);
     
-    return {
-      success: true,
-      data: responseData.data
-    } as unknown as T;
+    return responseData as unknown as T;
   } catch (error: any) {
     console.error(`Error calling Gemini API (${action}):`, error);
     return {
@@ -60,7 +55,6 @@ export const generateCourseWithGemini = async (
   difficulty: string
 ): Promise<GeminiResponse> => {
   return callGeminiApi<GeminiResponse>('generate_course', {
-    courseId,
     topic,
     purpose,
     difficulty
@@ -103,13 +97,11 @@ export const analyzeInterviewResponseWithGemini = async (
  * Generate flashcards using the Gemini API
  */
 export const generateFlashcardsWithGemini = async (
-  courseId: string,
   topic: string,
   purpose: string,
   difficulty: string
 ): Promise<GeminiResponse> => {
   return callGeminiApi<GeminiResponse>('generate_flashcards', {
-    courseId,
     topic,
     purpose,
     difficulty

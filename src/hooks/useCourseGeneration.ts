@@ -26,6 +26,7 @@ export const useCourseGeneration = () => {
   const [generationInBackground, setGenerationInBackground] = useState(false);
   const [courseGenerationId, setCourseGenerationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     let intervalId: number | null = null;
@@ -59,6 +60,7 @@ export const useCourseGeneration = () => {
               if (intervalId) clearInterval(intervalId);
               setGenerationInBackground(false);
               setCourseGenerationId(null);
+              setProgress(100);
               
               sonnerToast.success('Course Generation Complete', {
                 description: `Your course "${course.title}" has been generated successfully.`,
@@ -71,7 +73,7 @@ export const useCourseGeneration = () => {
             // Check if we're generating additional resources like flashcards
             else if (content.status === 'generating_flashcards') {
               console.log("Generating additional flashcards for the course");
-              // Continue checking, don't clear the interval
+              setProgress(80); // Set progress to 80% when generating flashcards
               
               // Show a toast notification about the ongoing flashcards generation
               if (content.message) {
@@ -80,12 +82,17 @@ export const useCourseGeneration = () => {
                 });
               }
             }
+            else if (content.status === 'generating') {
+              // Simulate progress while in the generating state
+              setProgress(prev => Math.min(prev + 5, 70)); // Increment progress up to 70%
+            }
             // Check if there was an error in generation
             else if (content.status === 'error') {
               console.error("Course generation failed:", content.message);
               if (intervalId) clearInterval(intervalId);
               setGenerationInBackground(false);
               setCourseGenerationId(null);
+              setProgress(0);
               
               sonnerToast.error('Course Generation Failed', {
                 description: content.message || "An unknown error occurred",
@@ -97,9 +104,10 @@ export const useCourseGeneration = () => {
           if (intervalId) clearInterval(intervalId);
           setGenerationInBackground(false);
           setCourseGenerationId(null);
+          setProgress(0);
           setError("Failed to check course generation status. Please try again.");
         }
-      }, 5000);
+      }, 3000);
     }
     
     return () => {
@@ -119,6 +127,9 @@ export const useCourseGeneration = () => {
   ) => {
     try {
       console.log("Starting course generation for:", courseName);
+      
+      // Reset progress
+      setProgress(10);
       
       // Step 1: Create an empty course entry
       const { data: emptyCourse, error: courseError } = await supabase
@@ -145,6 +156,7 @@ export const useCourseGeneration = () => {
       setCourseGenerationId(emptyCourse.id);
       setGenerationInBackground(true);
       setError(null);
+      setProgress(20);
 
       // Start the background process using Flask API for Gemini
       processBackgroundCourseGeneration(
@@ -157,6 +169,7 @@ export const useCourseGeneration = () => {
       return emptyCourse.id;
     } catch (error: any) {
       console.error("Error in startCourseGeneration:", error);
+      setProgress(0);
       throw error;
     }
   };
@@ -178,6 +191,7 @@ export const useCourseGeneration = () => {
         .eq('id', courseId);
         
       console.log(`Updated course ${courseId} status to generating`);
+      setProgress(30);
 
       // Call Flask API for Gemini
       console.log(`Calling Flask API for course ${courseId}`);
@@ -190,16 +204,13 @@ export const useCourseGeneration = () => {
         }
         
         console.log(`Background generation completed successfully for course ${courseId}`);
+        setProgress(70);
         
         // Extract text content from response
-        const generationData = response.data;
-        let text = '';
+        const text = response.text || '';
         
-        if (generationData.candidates && generationData.candidates[0] && 
-            generationData.candidates[0].content && generationData.candidates[0].content.parts) {
-          text = generationData.candidates[0].content.parts[0].text;
-        } else {
-          throw new Error('Invalid response format from Gemini API');
+        if (!text) {
+          throw new Error('Empty response from Gemini API');
         }
         
         // Extract summary
@@ -211,6 +222,7 @@ export const useCourseGeneration = () => {
         
         // Parse the content into structured format
         const parsedContent = parseGeneratedContent(text);
+        setProgress(90);
         
         // Update course with complete content
         await supabase
@@ -227,6 +239,7 @@ export const useCourseGeneration = () => {
           .eq('id', courseId);
           
         console.log(`Course ${courseId} updated with generated content`);
+        setProgress(100);
       } catch (error: any) {
         console.error(`Error calling Flask API for Gemini: ${error.message}`);
         throw error;
@@ -234,6 +247,7 @@ export const useCourseGeneration = () => {
       
     } catch (error: any) {
       console.error(`Error in background processing for course ${courseId}:`, error);
+      setProgress(0);
       
       // Try to update the course with error status
       try {
@@ -392,6 +406,7 @@ export const useCourseGeneration = () => {
     generationInBackground,
     courseGenerationId,
     error,
+    progress,
     setError,
     startCourseGeneration,
     generateAdditionalFlashcards

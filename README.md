@@ -1,4 +1,5 @@
 
+
 # StudyMate - AI Learning and Interview Practice Platform
 
 StudyMate is an AI-powered platform for personalized learning and interview practice. Generate custom study materials and practice job interviews with AI feedback. 
@@ -17,10 +18,10 @@ This project is built with:
   - Tanstack React Query - For data fetching and state management
 
 - **Backend**:
+  - Flask API - Python backend for Gemini AI integration
   - Supabase - Backend as a service for:
     - PostgreSQL Database - Storing user data, courses, and interview records
     - Authentication - User management
-    - Edge Functions - For AI integrations with Google's Gemini API
 
 ## Prerequisites
 
@@ -28,6 +29,8 @@ Before you start, make sure you have the following installed:
 
 - [Node.js](https://nodejs.org/) (v18 or newer)
 - [npm](https://www.npmjs.com/) (included with Node.js)
+- [Python](https://www.python.org/) (v3.8 or newer)
+- [pip](https://pip.pypa.io/en/stable/installation/) (for Python packages)
 - A Supabase account for backend services
 - A Google Gemini API key for AI features
 
@@ -39,12 +42,19 @@ Before you start, make sure you have the following installed:
    cd studymate
    ```
 
-2. **Install dependencies**
+2. **Install frontend dependencies**
    ```sh
    npm install
    ```
 
-3. **Set up Supabase**
+3. **Install Python dependencies for Flask API**
+   ```sh
+   cd api
+   pip install flask flask_cors google-generativeai
+   cd ..
+   ```
+
+4. **Set up Supabase**
    
    This project uses Supabase for backend services. You'll need to:
    
@@ -58,42 +68,79 @@ Before you start, make sure you have the following installed:
       - `study_material` - For storing additional study content
       - `users` - For storing extended user profile data
 
-4. **Configure environment variables**
+5. **Configure environment variables**
    
    Create a file named `.env.local` in the root directory and add the following:
 
    ```
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   VITE_FLASK_API_URL=http://localhost:5000
    ```
 
-5. **Deploy Supabase Edge Functions**
+6. **Set up Google Gemini API**
 
-   The project uses Supabase Edge Functions to communicate with Google's Gemini API. You'll need to:
-   
-   1. Install the Supabase CLI: `npm install -g supabase`
-   2. Login to Supabase CLI: `supabase login`
-   3. Link your project: `supabase link --project-ref your-project-ref`
-   4. Deploy the edge functions: `supabase functions deploy gemini-api`
-   5. Add your Gemini API key as a secret to the edge function:
+   1. Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   2. Create a file named `.env` in the `api` directory with the following:
       ```
-      supabase secrets set GEMINI_API_KEY=your_gemini_api_key
+      GEMINI_API_KEY=your_gemini_api_key
+      FLASK_DEBUG=true
       ```
 
 ## Running the Application
 
-1. **Start the development server**
+1. **Start the Flask API server**
+   ```sh
+   cd api
+   python flask_api.py
+   ```
+
+2. **Start the frontend development server in a separate terminal**
    ```sh
    npm run dev
    ```
 
-2. **Access the application**
+3. **Access the application**
    
    Open your browser and navigate to `http://localhost:5173` (or the port shown in your terminal)
 
+## Testing the Gemini API Integration
+
+To verify that the Gemini API integration is working properly:
+
+1. **Test course generation:**
+   - Sign in to the application
+   - Navigate to the Course Generator page
+   - Fill in the form with a course topic, purpose, and difficulty level
+   - Click "Generate Course"
+   - Check the browser console for API call logs with the Flask API
+   - Verify that a progress bar appears showing the generation process
+   - You should see a success message when complete
+
+2. **Test the chatbot:**
+   - Open the application
+   - Find the chatbot interface (typically in the lower right corner)
+   - Type a message and send it
+   - Check the browser console for API call logs with the Flask API
+   - Verify that you receive a response from the AI
+
+3. **Test mock interviews:**
+   - Sign in to the application
+   - Navigate to the Mock Interview page
+   - Set up an interview with a job role, tech stack, and experience level
+   - Start the interview
+   - Check the browser console for API call logs with the Flask API
+   - Verify that interview questions are generated
+
+4. **Debugging Flask API:**
+   - If you're experiencing issues with the API, check the terminal running the Flask server for error logs
+   - Verify that your Gemini API key is correctly set in the `.env` file in the `api` directory
+   - Ensure the Flask server is running on the correct port (default is 5000)
+   - Check that `VITE_FLASK_API_URL` in your frontend `.env.local` points to the correct URL
+
 ## Project Structure
 
-- `/src` - Source code
+- `/src` - Frontend source code
   - `/components` - React components
   - `/context` - Context providers
   - `/hooks` - Custom React hooks
@@ -102,8 +149,8 @@ Before you start, make sure you have the following installed:
   - `/pages` - Page components
   - `/services` - API service functions
   - `/types` - TypeScript type definitions
-- `/supabase` - Supabase configuration and edge functions
-  - `/functions` - Edge function implementations
+- `/api` - Flask API for Gemini integration
+  - `flask_api.py` - API server implementation
 
 ## Key Features
 
@@ -153,20 +200,15 @@ Make sure your Supabase database has the following tables correctly set up:
    - `recommendations` (JSON, nullable)
    - `created_at` (timestamp)
 
-## Gemini API Configuration
-
-This project uses Google's Gemini API for AI features. You'll need to:
-
-1. Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Add your Gemini API key to Supabase edge function secrets as described in the setup instructions
-
 ## Troubleshooting
 
-- **API Key Issues**: Ensure your Gemini API key is correctly set in Supabase Edge Function secrets
+- **API Key Issues**: Ensure your Gemini API key is correctly set in the api/.env file
+- **Flask API Connection Issues**: Check that the Flask server is running and the VITE_FLASK_API_URL is correct
 - **Database Errors**: Check that your Supabase database schema matches the required structure
 - **Authentication Problems**: Verify your Supabase authentication settings are properly configured
-- **Course Generation Errors**: If courses aren't generating, check the Edge Function logs in your Supabase dashboard
+- **Course Generation Errors**: Check the Flask API console logs for detailed error messages
 
 ## License
 
 [MIT License](LICENSE)
+

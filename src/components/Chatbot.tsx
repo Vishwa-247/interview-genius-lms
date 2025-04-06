@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2 } from "lucide-react";
 import GlassMorphism from "./ui/GlassMorphism";
+import { FLASK_API_URL } from "@/configs/environment";
 
 interface Message {
   id: string;
@@ -14,7 +15,7 @@ const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      content: "👋 Hi there! I'm your InterviewGenius assistant. How can I help you today?",
+      content: "👋 Hi there! I'm your StudyMate assistant. How can I help you today?",
       sender: "bot",
       timestamp: new Date()
     }
@@ -48,28 +49,51 @@ const Chatbot = () => {
     setInput("");
     setIsLoading(true);
     
-    // Simulate API call to Gemini
-    // In a real app, you would call your Gemini Edge Function here
-    setTimeout(() => {
-      const responses = [
-        "I'd be happy to help you with that! What specific topics are you interested in?",
-        "You can generate study materials by going to the Course Generator page and entering your topic of interest.",
-        "The Mock Interview feature helps you practice for job interviews with AI-generated questions tailored to your role and experience.",
-        "If you're preparing for a job interview, I recommend starting with our interview preparation course generator.",
-        "You can access your saved courses and interviews from the Dashboard page.",
-        "Feel free to ask me any other questions about how to use InterviewGenius!"
-      ];
+    try {
+      // Direct call to Flask API
+      const response = await fetch(`${FLASK_API_URL}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'custom_content',
+          prompt: `You are a helpful assistant for StudyMate, an AI-powered learning platform. 
+                  Answer the following question or request concisely and helpfully:
+                  ${input}`
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Flask API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const botResponse = data.text || "I'm sorry, I couldn't process your request at the moment.";
       
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: botResponse,
         sender: "bot",
         timestamp: new Date()
       };
       
       setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error("Error calling Flask API:", error);
+      
+      // Fallback response in case of API error
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I encountered an error while processing your request. Please try again later.",
+        sender: "bot",
+        timestamp: new Date()
+      };
+      
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

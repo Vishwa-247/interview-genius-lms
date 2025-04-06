@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import Container from "@/components/ui/Container";
 import CourseForm from "@/components/course/CourseForm";
 import HowItWorks from "@/components/course/HowItWorks";
@@ -22,6 +23,7 @@ const CourseGenerator = () => {
   const { 
     generationInBackground, 
     error, 
+    progress,
     setError, 
     startCourseGeneration 
   } = useCourseGeneration();
@@ -103,6 +105,14 @@ const CourseGenerator = () => {
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      {generationInBackground && (
+        <div className="mb-8">
+          <p className="text-sm font-medium mb-2">Generating your course...</p>
+          <Progress value={progress} className="h-2 mb-2" />
+          <p className="text-xs text-muted-foreground">{progress}% complete</p>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
