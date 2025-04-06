@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Clock } from "lucide-react";
+import { Loader2, Clock, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ interface CourseGenerationStatusProps {
   progress: number;
   status: string;
   startTime?: string;
+  errorMessage?: string;
 }
 
 const CourseGenerationStatus = ({ 
@@ -19,7 +20,8 @@ const CourseGenerationStatus = ({
   title, 
   progress, 
   status,
-  startTime
+  startTime,
+  errorMessage
 }: CourseGenerationStatusProps) => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   
@@ -66,6 +68,7 @@ const CourseGenerationStatus = ({
       case 'error':
         return (
           <div className="flex items-center text-red-500">
+            <AlertTriangle className="h-4 w-4 mr-2" />
             <span>Failed</span>
           </div>
         );
@@ -95,6 +98,12 @@ const CourseGenerationStatus = ({
       <CardContent>
         <div className="space-y-4">
           <Progress value={progress} className="h-1.5" />
+          
+          {status === 'error' && errorMessage && (
+            <div className="text-sm text-red-500 mt-2 mb-2">
+              {errorMessage}
+            </div>
+          )}
           
           <div className="mt-4">
             <Button 

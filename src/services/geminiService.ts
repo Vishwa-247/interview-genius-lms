@@ -19,6 +19,12 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
   try {
     console.log(`Calling Gemini API directly: ${action}`, data);
     
+    // Verify API key is available
+    if (!GEMINI_API_KEY) {
+      console.error('Gemini API key is missing. Please add VITE_GEMINI_API_KEY to your environment variables.');
+      throw new Error('API key is required for Gemini API calls. Please check your environment configuration.');
+    }
+    
     // Add a timeout to the fetch to prevent hanging requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
