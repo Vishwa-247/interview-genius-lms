@@ -1,5 +1,5 @@
 
-import { GEMINI_API_KEY } from '@/configs/environment';
+import { GEMINI_API_KEY, COURSE_PROMPT_TEMPLATE, INTERVIEW_QUESTIONS_PROMPT_TEMPLATE } from '@/configs/environment';
 
 /**
  * Service for interacting with the Gemini API directly
@@ -29,60 +29,23 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
     
-    // Create the prompt based on the action
+    // Create the prompt based on the action and template
     let prompt = '';
     
     switch (action) {
       case 'generate_course':
-        prompt = `Create a comprehensive learning course about "${data.topic}" for ${data.purpose} purpose at ${data.difficulty} level.
-                  Structure your response as follows:
-                  # SUMMARY
-                  [Provide a concise summary of the course]
-
-                  # CHAPTERS
-                  ## [Chapter 1 Title]
-                  [Chapter 1 content]
-
-                  ## [Chapter 2 Title]
-                  [Chapter 2 content]
-                  
-                  [... more chapters]
-
-                  # FLASHCARDS
-                  - Question: [Question 1]
-                  - Answer: [Answer 1]
-                  
-                  - Question: [Question 2]
-                  - Answer: [Answer 2]
-                  
-                  [... more flashcards]
-
-                  # MCQs (Multiple Choice Questions)
-                  - Question: [Question 1]
-                  - Options: 
-                  a) [Option A]
-                  b) [Option B]
-                  c) [Option C]
-                  d) [Option D]
-                  - Correct Answer: [a/b/c/d]
-                  
-                  [... more MCQs]
-
-                  # Q&A PAIRS
-                  - Question: [Question 1]
-                  - Answer: [Answer 1]
-                  
-                  - Question: [Question 2]
-                  - Answer: [Answer 2]
-                  
-                  [... more Q&A pairs]`;
+        prompt = COURSE_PROMPT_TEMPLATE
+          .replace('{topic}', data.topic)
+          .replace('{purpose}', data.purpose)
+          .replace('{difficulty}', data.difficulty);
         break;
       
       case 'generate_interview_questions':
-        prompt = `Generate ${data.questionCount} interview questions for a ${data.jobRole} position 
-                  with experience level of ${data.experience} years, 
-                  focusing on the following tech stack: ${data.techStack}. 
-                  Format the questions as a numbered list.`;
+        prompt = INTERVIEW_QUESTIONS_PROMPT_TEMPLATE
+          .replace('{jobRole}', data.jobRole)
+          .replace('{techStack}', data.techStack)
+          .replace('{experience}', data.experience)
+          .replace('{questionCount}', data.questionCount || '5');
         break;
       
       case 'analyze_interview':
@@ -108,8 +71,11 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
         prompt = `Please respond to: ${JSON.stringify(data)}`;
     }
     
+    // Select the appropriate model based on the action
+    const model = action === 'generate_course' ? 'gemini-1.5-flash' : 'gemini-1.0-pro';
+    
     // API call to Gemini
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -144,7 +110,7 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
     }
 
     const responseData = await response.json();
-    console.log(`Received response from Gemini API: ${action}`, responseData);
+    console.log(`Received response from Gemini API: ${action}`);
     
     // Extract text from Gemini response
     let text = '';
@@ -152,7 +118,7 @@ const callGeminiApi = async <T>(action: string, data: any): Promise<T> => {
       text = responseData.candidates[0].content.parts[0].text || '';
     } catch (error) {
       console.error("Error extracting text from Gemini response:", error);
-      text = "Error: Unable to extract text from Gemini response";
+      throw new Error("Unable to extract text from Gemini response");
     }
     
     return {

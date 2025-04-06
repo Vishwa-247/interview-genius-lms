@@ -13,6 +13,7 @@ interface CourseGenerationStatusProps {
   status: string;
   startTime?: string;
   errorMessage?: string;
+  onRetry?: () => void;
 }
 
 const CourseGenerationStatus = ({ 
@@ -21,7 +22,8 @@ const CourseGenerationStatus = ({
   progress, 
   status,
   startTime,
-  errorMessage
+  errorMessage,
+  onRetry
 }: CourseGenerationStatusProps) => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   
@@ -49,7 +51,7 @@ const CourseGenerationStatus = ({
         return (
           <div className="flex items-center text-amber-500">
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            <span>Generating</span>
+            <span>Generating course content</span>
           </div>
         );
       case 'generating_flashcards':
@@ -102,6 +104,16 @@ const CourseGenerationStatus = ({
           {status === 'error' && errorMessage && (
             <div className="text-sm text-red-500 mt-2 mb-2">
               {errorMessage}
+              {onRetry && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onRetry} 
+                  className="ml-2 text-xs"
+                >
+                  Retry
+                </Button>
+              )}
             </div>
           )}
           
