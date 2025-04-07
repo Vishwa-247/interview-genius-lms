@@ -1,64 +1,75 @@
 
 # StudyMate AI Learning Platform
 
+## Overview
+
+StudyMate is an AI-powered learning platform that helps users generate interactive courses and practice for interviews. The platform includes:
+
+- Course generation on various topics
+- Interactive flashcards for effective learning
+- Quiz system with multiple-choice questions
+- Mock interview preparation with simulated questions
+- Real-time progress tracking
+
 ## Environment Setup
 
-This application requires the following environment variables to be set in a `.env` file in the root directory:
+This application currently uses static data by default for course generation and mock interviews, but you can configure it to use the Gemini API for dynamic content generation.
 
-```
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-### Getting a Gemini API Key
-
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create an API key
-3. Copy the API key and paste it into your `.env` file as `VITE_GEMINI_API_KEY`
-
-## Running the Application
+### Setting Up the Environment
 
 1. Clone the repository
 2. Install dependencies: `npm install`
-3. Create a `.env` file in the root directory and add the environment variables as described above
+3. Create a `.env` file in the root directory (optional for API integration)
 4. Start the application: `npm run dev`
 
+### Using the Gemini API (Optional)
+
+If you want to use dynamic content generation with Google's Gemini API:
+
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create an API key
+3. Add the key to your `.env` file:
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+4. Open `src/configs/environment.ts` and set `USE_STATIC_DATA = false`
+
 ## Features
-
-- AI-powered course generation using Google's Gemini API
-- Interactive flashcards
-- Quiz system with multiple-choice questions
-- Mock interview preparation with AI feedback
-- Real-time progress tracking
-
-## How It Works
 
 ### Course Generation
 
 1. Enter a topic, purpose, and difficulty level
-2. The application calls the Gemini API directly to generate comprehensive course content
-3. Content is structured with chapters, flashcards, quizzes, and Q&A sections
-4. Progress is tracked in real-time with a loading indicator
+2. The application generates comprehensive course content with:
+   - Structured chapters with detailed explanations
+   - Flashcards for key concepts
+   - Multiple-choice questions to test understanding
+   - Q&A pairs for deeper learning
 
 ### Mock Interviews
 
 1. Enter job role, tech stack, and experience level
-2. AI generates relevant interview questions
-3. Practice answering questions in a simulated interview environment
-4. Receive AI feedback on your responses
+2. Practice with role-specific interview questions
+3. Record your answers with video for self-assessment
+4. Receive feedback on your performance
+
+## How It Works
+
+The application now uses pre-defined static data for immediate functionality without requiring API keys. When you create a course or mock interview, it will use relevant templates based on the topics you select.
+
+If you configure the Gemini API key and disable static data mode, the application will generate custom content tailored to your specific requests.
 
 ## Troubleshooting
 
-### API Authentication Issues
+### No Content Generated
 
-If you see a 403 error related to the Gemini API:
-1. Check that your `VITE_GEMINI_API_KEY` is correctly set in the `.env` file
-2. Make sure your API key is valid and has not expired
-3. Verify that you have enabled the Generative Language API in your Google Cloud Console
+If you're not seeing content generated:
+- Make sure you are using the latest version of the application
+- Check that `USE_STATIC_DATA` is set to `true` in `src/configs/environment.ts`
+- If using API mode, verify your API key is correctly set in the `.env` file
 
-### Course Generation Failures
+### Using Your Own Backend
 
-If course generation fails:
-1. Check the console for specific error messages
-2. Verify your internet connection
-3. Try with a simpler topic or lower difficulty level
-4. The system will automatically retry up to 3 times and has a fallback mechanism
+If you want to use your own backend service instead:
+1. Create a Flask API following the structure in `api/flask_api.py`
+2. Set `VITE_FLASK_API_URL` in your `.env` file to point to your backend
+3. Update the relevant API service calls in the codebase
